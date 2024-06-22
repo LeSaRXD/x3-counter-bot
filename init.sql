@@ -35,11 +35,30 @@ CREATE TABLE public.counter (
 ALTER TABLE public.counter OWNER TO x3_admin;
 
 --
+-- Name: opt_out; Type: TABLE; Schema: public; Owner: x3_admin
+--
+
+CREATE TABLE public.opt_out (
+    user_id text NOT NULL
+);
+
+
+ALTER TABLE public.opt_out OWNER TO x3_admin;
+
+--
 -- Name: counter counter_pkey; Type: CONSTRAINT; Schema: public; Owner: x3_admin
 --
 
 ALTER TABLE ONLY public.counter
     ADD CONSTRAINT counter_pkey PRIMARY KEY (user_id, emote);
+
+
+--
+-- Name: opt_out opt_out_user_id_key; Type: CONSTRAINT; Schema: public; Owner: x3_admin
+--
+
+ALTER TABLE ONLY public.opt_out
+    ADD CONSTRAINT opt_out_user_id_key UNIQUE (user_id);
 
 
 --
