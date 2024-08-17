@@ -52,11 +52,11 @@ ALTER TABLE ONLY public.counter
 
 
 --
--- Name: options opt_out_user_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: options options_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.options
-    ADD CONSTRAINT opt_out_user_id_key UNIQUE (user_id);
+    ADD CONSTRAINT options_pkey PRIMARY KEY (user_id);
 
 
 --
