@@ -3,14 +3,17 @@ mod database;
 #[macro_use]
 extern crate sqlx;
 
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::env;
 
-use database::DatabaseHandler;
+use database::{DatabaseHandler, LeaderboardRow};
 use dotenv::dotenv;
 use regex::Regex;
 use serenity::all::{
 	Command, CommandInteraction, CreateCommand, CreateInteractionResponse,
-	CreateInteractionResponseMessage, Interaction, InteractionResponseFlags,
+	CreateInteractionResponseMessage, EditInteractionResponse, Interaction,
+	InteractionResponseFlags,
 };
 use serenity::async_trait;
 use serenity::model::channel::Message;
@@ -29,6 +32,7 @@ const OPT_OUT: &str = "opt_out";
 const SILENT: &str = "silent";
 const VERBOSE: &str = "verbose";
 const COUNTS: &str = "counts";
+const LEADERBOARD: &str = "leaderboard";
 
 impl Handler {
 	async fn register_commands(&self, ctx: &Context) -> Result<(), SerenityError> {
@@ -54,13 +58,17 @@ impl Handler {
 		Command::create_global_command(&ctx, counts).await?;
 		println!("Registered {COUNTS} command");
 
+		let leaderboard = CreateCommand::new(LEADERBOARD).description("Get the 'x3' leaderboard");
+		Command::create_global_command(&ctx, leaderboard).await?;
+		println!("Registered {LEADERBOARD} command");
+
 		Ok(())
 	}
 
 	async fn run_command(
 		&self,
 		cmd: &CommandInteraction,
-	) -> sqlx::Result<Option<CreateInteractionResponse>> {
+	) -> sqlx::Result<Option<(CreateInteractionResponse, Option<EditInteractionResponse>)>> {
 		let user_id = cmd.user.id.get();
 		let (content, flags) = match cmd.data.name.as_str() {
 			OPT_IN => {
@@ -106,13 +114,41 @@ impl Handler {
 				};
 				(content, InteractionResponseFlags::empty())
 			}
+			LEADERBOARD => {
+				let mut emote_map: HashMap<Box<str>, Vec<LeaderboardRow>> = HashMap::new();
+				let leaderboard = self.db_handler.leaderboard(5).await?;
+				for row in leaderboard {
+					match emote_map.entry(row.emote.clone()) {
+						Entry::Occupied(mut o) => o.get_mut().push(row),
+						Entry::Vacant(v) => v.insert(Default::default()).push(row),
+					}
+				}
+				let leaderboard_str = emote_map
+					.into_iter()
+					.map(|(emote, rows)| {
+						let rows_str = rows
+							.iter()
+							.map(ToString::to_string)
+							.collect::<Box<[_]>>()
+							.join("\n");
+						format!("## {emote}\n{rows_str}")
+					})
+					.collect::<Box<[_]>>()
+					.join("\n");
+
+				let res1 = CreateInteractionResponseMessage::new().content("loading");
+				return Ok(Some((
+					CreateInteractionResponse::Message(res1),
+					Some(EditInteractionResponse::new().content(leaderboard_str)),
+				)));
+			}
 			_ => return Ok(None),
 		};
 
 		let msg = CreateInteractionResponseMessage::new()
 			.content(content)
 			.flags(flags);
-		Ok(Some(CreateInteractionResponse::Message(msg)))
+		Ok(Some((CreateInteractionResponse::Message(msg), None)))
 	}
 }
 
@@ -163,13 +199,20 @@ impl EventHandler for Handler {
 			return;
 		};
 
-		let response = match self.run_command(&command).await {
-			Ok(Some(res)) => res,
+		let result = match self.run_command(&command).await {
+			Ok(Some((response, None))) => command.create_response(&ctx.http, response).await,
+			Ok(Some((create, Some(edit)))) => {
+				if let Err(err) = command.create_response(&ctx.http, create).await {
+					Err(err)
+				} else {
+					command.edit_response(&ctx.http, edit).await.map(|_| ())
+				}
+			}
 			Ok(None) => return,
 			Err(why) => return eprintln!("DB error: {why}"),
 		};
 
-		if let Err(why) = command.create_response(&ctx.http, response).await {
+		if let Err(why) = result {
 			println!("Cannot respond to slash command: {why}");
 		}
 	}

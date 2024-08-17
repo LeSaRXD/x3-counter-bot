@@ -1,0 +1,40 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "WITH ranked AS (\n\t\t\t\tSELECT user_id, emote, count, DENSE_RANK() OVER (PARTITION BY emote ORDER BY count DESC) AS rank FROM counter\n\t\t\t)\n\t\t\tSELECT\n\t\t\t\temote,\n\t\t\t\tuser_id,\n\t\t\t\tcount,\n\t\t\t\trank AS \"rank!\"\n\t\t\tFROM ranked\n\t\t\tWHERE rank <= $1\n\t\t\tORDER BY emote, rank ASC",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "emote",
+        "type_info": "Bpchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "user_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "count",
+        "type_info": "Int4"
+      },
+      {
+        "ordinal": 3,
+        "name": "rank!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null
+    ]
+  },
+  "hash": "cc2395b3b2c60fd6ac4242c4a84c80019fd7000d72d8631d6e69b3abe6ecb710"
+}

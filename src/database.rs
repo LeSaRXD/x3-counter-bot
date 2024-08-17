@@ -1,8 +1,23 @@
+use std::fmt::Display;
+
 use sqlx::PgPool;
 
 pub struct UserCount {
 	pub emote: Box<str>,
 	pub count: i32,
+}
+
+#[derive(Debug)]
+pub struct LeaderboardRow {
+	pub emote: Box<str>,
+	pub user_id: Box<str>,
+	pub count: i64,
+	pub rank: i64,
+}
+impl Display for LeaderboardRow {
+	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+		write!(f, "{}. <@{}> - {}", self.rank, self.user_id, self.count)
+	}
 }
 
 pub struct DatabaseHandler {
@@ -88,6 +103,26 @@ impl DatabaseHandler {
 			user_id.to_string(),
 		)
 		.fetch_one(&self.pool)
+		.await
+	}
+
+	pub async fn leaderboard(&self, top: u64) -> sqlx::Result<Vec<LeaderboardRow>> {
+		sqlx::query_as!(
+			LeaderboardRow,
+			r#"WITH ranked AS (
+				SELECT user_id, emote, count, DENSE_RANK() OVER (PARTITION BY emote ORDER BY count DESC) AS rank FROM counter
+			)
+			SELECT
+				emote,
+				user_id,
+				count,
+				rank AS "rank!"
+			FROM ranked
+			WHERE rank <= $1
+			ORDER BY emote, rank ASC"#,
+			top as i64,
+		)
+		.fetch_all(&self.pool)
 		.await
 	}
 }
