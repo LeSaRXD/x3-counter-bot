@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT emote, count FROM counter WHERE user_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "emote",
+        "type_info": "Bpchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "count",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "f11acc206db6c3823658f0fc2ffaf22d24a9a90d62c0e235b020e2aaa361f2a1"
+}

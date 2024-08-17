@@ -1,0 +1,22 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS(\n\t\t\t\tSELECT * FROM options WHERE user_id = $1 AND opt_out\n\t\t\t) AS \"exists!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "47079ebf3bd7b9e9ddf1f3f50a6e52971a69dcfbb88b13e0b2ed198358062087"
+}
