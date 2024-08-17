@@ -9,8 +9,8 @@ use database::DatabaseHandler;
 use dotenv::dotenv;
 use regex::Regex;
 use serenity::all::{
-	Command, CreateCommand, CreateInteractionResponse, CreateInteractionResponseMessage,
-	Interaction,
+	Command, CommandInteraction, CreateCommand, CreateInteractionResponse,
+	CreateInteractionResponseMessage, Interaction, InteractionResponseFlags,
 };
 use serenity::async_trait;
 use serenity::model::channel::Message;
@@ -28,6 +28,7 @@ const OPT_IN: &str = "opt_in";
 const OPT_OUT: &str = "opt_out";
 const SILENT: &str = "silent";
 const VERBOSE: &str = "verbose";
+const COUNTS: &str = "counts";
 
 impl Handler {
 	async fn register_commands(&self, ctx: &Context) -> Result<(), SerenityError> {
@@ -49,7 +50,69 @@ impl Handler {
 		Command::create_global_command(&ctx, verbose).await?;
 		println!("Registered {VERBOSE} command");
 
+		let counts = CreateCommand::new(COUNTS).description("Get your 'x3' counts");
+		Command::create_global_command(&ctx, counts).await?;
+		println!("Registered {COUNTS} command");
+
 		Ok(())
+	}
+
+	async fn run_command(
+		&self,
+		cmd: &CommandInteraction,
+	) -> sqlx::Result<Option<CreateInteractionResponse>> {
+		let user_id = cmd.user.id.get();
+		let (content, flags) = match cmd.data.name.as_str() {
+			OPT_IN => {
+				self.db_handler.set_opt_out(user_id, false).await?;
+				(
+					"I will count your ':3's now UwU".to_owned(),
+					InteractionResponseFlags::EPHEMERAL,
+				)
+			}
+			OPT_OUT => {
+				self.db_handler.set_opt_out(user_id, true).await?;
+				(
+					"I won't count your ':3's now qwq".to_owned(),
+					InteractionResponseFlags::EPHEMERAL,
+				)
+			}
+			SILENT => {
+				self.db_handler.set_silent(user_id, true).await?;
+				(
+					"I won't respond to your messages but will still count 'x3's".to_owned(),
+					InteractionResponseFlags::EPHEMERAL,
+				)
+			}
+			VERBOSE => {
+				self.db_handler.set_silent(user_id, false).await?;
+				(
+					"I will now respond to your messages".to_owned(),
+					InteractionResponseFlags::EPHEMERAL,
+				)
+			}
+			COUNTS => {
+				let counts = self.db_handler.get_user_counts(user_id).await?;
+				let content = match counts.as_slice() {
+					&[] => "You don't have any 'x3's yet :c".to_owned(),
+					counts => format!(
+						"Here are your counts:\n{}",
+						counts
+							.iter()
+							.map(|c| format!("{} - {}", c.emote, c.count))
+							.collect::<Vec<_>>()
+							.join("\n")
+					),
+				};
+				(content, InteractionResponseFlags::empty())
+			}
+			_ => return Ok(None),
+		};
+
+		let msg = CreateInteractionResponseMessage::new()
+			.content(content)
+			.flags(flags);
+		Ok(Some(CreateInteractionResponse::Message(msg)))
 	}
 }
 
@@ -99,39 +162,14 @@ impl EventHandler for Handler {
 		let Interaction::Command(command) = interaction else {
 			return;
 		};
-		let user_id = command.user.id.get();
 
-		let content = match command.data.name.as_str() {
-			OPT_IN => {
-				if let Err(e) = self.db_handler.set_opt_out(user_id, false).await {
-					return eprintln!("DB error: {e}");
-				};
-				"I will count your ':3's now uwu"
-			}
-			OPT_OUT => {
-				if let Err(e) = self.db_handler.set_opt_out(user_id, true).await {
-					return eprintln!("DB error: {e}");
-				};
-				"I won't count your ':3's now qwq"
-			}
-			SILENT => {
-				if let Err(e) = self.db_handler.set_silent(user_id, true).await {
-					return eprintln!("DB error: {e}");
-				};
-				"I won't respond to your messages but will still count 'x3's"
-			}
-			VERBOSE => {
-				if let Err(e) = self.db_handler.set_silent(user_id, false).await {
-					return eprintln!("DB error: {e}");
-				};
-				"I will now respond to your messages"
-			}
-			_ => return,
+		let response = match self.run_command(&command).await {
+			Ok(Some(res)) => res,
+			Ok(None) => return,
+			Err(why) => return eprintln!("DB error: {why}"),
 		};
 
-		let data = CreateInteractionResponseMessage::new().content(content);
-		let builder = CreateInteractionResponse::Message(data);
-		if let Err(why) = command.create_response(&ctx.http, builder).await {
+		if let Err(why) = command.create_response(&ctx.http, response).await {
 			println!("Cannot respond to slash command: {why}");
 		}
 	}

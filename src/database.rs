@@ -1,10 +1,15 @@
-use sqlx::{Pool, Postgres};
+use sqlx::PgPool;
+
+pub struct UserCount {
+	pub emote: Box<str>,
+	pub count: i32,
+}
 
 pub struct DatabaseHandler {
-	pool: Pool<Postgres>,
+	pool: PgPool,
 }
 impl DatabaseHandler {
-	pub fn new(pool: Pool<Postgres>) -> Self {
+	pub fn new(pool: PgPool) -> Self {
 		Self { pool }
 	}
 }
@@ -29,6 +34,15 @@ impl DatabaseHandler {
 			.await?
 			.count,
 		))
+	}
+	pub async fn get_user_counts(&self, user_id: u64) -> sqlx::Result<Vec<UserCount>> {
+		sqlx::query_as!(
+			UserCount,
+			r#"SELECT emote, count FROM counter WHERE user_id = $1"#,
+			user_id.to_string()
+		)
+		.fetch_all(&self.pool)
+		.await
 	}
 
 	pub async fn set_opt_out(&self, user_id: u64, value: bool) -> sqlx::Result<()> {
