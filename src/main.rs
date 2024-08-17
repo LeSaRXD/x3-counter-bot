@@ -11,9 +11,8 @@ use database::{DatabaseHandler, LeaderboardRow};
 use dotenv::dotenv;
 use regex::Regex;
 use serenity::all::{
-	Command, CommandInteraction, CreateCommand, CreateInteractionResponse,
-	CreateInteractionResponseMessage, EditInteractionResponse, Interaction,
-	InteractionResponseFlags,
+	Command, CommandInteraction, CreateAllowedMentions, CreateCommand, CreateInteractionResponse,
+	CreateInteractionResponseMessage, Interaction, InteractionResponseFlags,
 };
 use serenity::async_trait;
 use serenity::model::channel::Message;
@@ -68,36 +67,33 @@ impl Handler {
 	async fn run_command(
 		&self,
 		cmd: &CommandInteraction,
-	) -> sqlx::Result<Option<(CreateInteractionResponse, Option<EditInteractionResponse>)>> {
+	) -> sqlx::Result<Option<CreateInteractionResponse>> {
 		let user_id = cmd.user.id.get();
-		let (content, flags) = match cmd.data.name.as_str() {
+		let msg = match cmd.data.name.as_str() {
 			OPT_IN => {
 				self.db_handler.set_opt_out(user_id, false).await?;
-				(
-					"I will count your ':3's now UwU".to_owned(),
-					InteractionResponseFlags::EPHEMERAL,
-				)
+				CreateInteractionResponseMessage::new()
+					.content("I will count your ':3's now UwU")
+					.flags(InteractionResponseFlags::EPHEMERAL)
 			}
 			OPT_OUT => {
 				self.db_handler.set_opt_out(user_id, true).await?;
-				(
-					"I won't count your ':3's now qwq".to_owned(),
-					InteractionResponseFlags::EPHEMERAL,
-				)
+				CreateInteractionResponseMessage::new()
+					.content("I won't count your ':3's now qwq")
+					.flags(InteractionResponseFlags::EPHEMERAL)
 			}
 			SILENT => {
 				self.db_handler.set_silent(user_id, true).await?;
-				(
-					"I won't respond to your messages but will still count 'x3's".to_owned(),
-					InteractionResponseFlags::EPHEMERAL,
-				)
+
+				CreateInteractionResponseMessage::new()
+					.content("I won't respond to your messages but will still count 'x3's")
+					.flags(InteractionResponseFlags::EPHEMERAL)
 			}
 			VERBOSE => {
 				self.db_handler.set_silent(user_id, false).await?;
-				(
-					"I will now respond to your messages".to_owned(),
-					InteractionResponseFlags::EPHEMERAL,
-				)
+				CreateInteractionResponseMessage::new()
+					.content("I will now respond to your messages")
+					.flags(InteractionResponseFlags::EPHEMERAL)
 			}
 			COUNTS => {
 				let counts = self.db_handler.get_user_counts(user_id).await?;
@@ -112,7 +108,7 @@ impl Handler {
 							.join("\n")
 					),
 				};
-				(content, InteractionResponseFlags::empty())
+				CreateInteractionResponseMessage::new().content(content)
 			}
 			LEADERBOARD => {
 				let mut emote_map: HashMap<Box<str>, Vec<LeaderboardRow>> = HashMap::new();
@@ -123,7 +119,7 @@ impl Handler {
 						Entry::Vacant(v) => v.insert(Default::default()).push(row),
 					}
 				}
-				let leaderboard_str = emote_map
+				let content = emote_map
 					.into_iter()
 					.map(|(emote, rows)| {
 						let rows_str = rows
@@ -136,19 +132,14 @@ impl Handler {
 					.collect::<Box<[_]>>()
 					.join("\n");
 
-				let res1 = CreateInteractionResponseMessage::new().content("loading");
-				return Ok(Some((
-					CreateInteractionResponse::Message(res1),
-					Some(EditInteractionResponse::new().content(leaderboard_str)),
-				)));
+				CreateInteractionResponseMessage::new()
+					.content(content)
+					.allowed_mentions(CreateAllowedMentions::new())
 			}
 			_ => return Ok(None),
 		};
 
-		let msg = CreateInteractionResponseMessage::new()
-			.content(content)
-			.flags(flags);
-		Ok(Some((CreateInteractionResponse::Message(msg), None)))
+		Ok(Some(CreateInteractionResponse::Message(msg)))
 	}
 }
 
@@ -199,20 +190,13 @@ impl EventHandler for Handler {
 			return;
 		};
 
-		let result = match self.run_command(&command).await {
-			Ok(Some((response, None))) => command.create_response(&ctx.http, response).await,
-			Ok(Some((create, Some(edit)))) => {
-				if let Err(err) = command.create_response(&ctx.http, create).await {
-					Err(err)
-				} else {
-					command.edit_response(&ctx.http, edit).await.map(|_| ())
-				}
-			}
+		let response = match self.run_command(&command).await {
+			Ok(Some(r)) => r,
 			Ok(None) => return,
 			Err(why) => return eprintln!("DB error: {why}"),
 		};
 
-		if let Err(why) = result {
+		if let Err(why) = command.create_response(&ctx.http, response).await {
 			println!("Cannot respond to slash command: {why}");
 		}
 	}

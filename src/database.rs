@@ -16,7 +16,7 @@ pub struct LeaderboardRow {
 }
 impl Display for LeaderboardRow {
 	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}. <@{}> - {}", self.rank, self.user_id, self.count)
+		write!(f, "{}\\. <@{}> - {}", self.rank, self.user_id, self.count)
 	}
 }
 
