@@ -24,8 +24,46 @@ struct Handler {
 	db_handler: DatabaseHandler,
 }
 
+const OPT_IN: &str = "opt_in";
+const OPT_OUT: &str = "opt_out";
+const SILENT: &str = "silent";
+const VERBOSE: &str = "verbose";
+
+impl Handler {
+	async fn register_commands(&self, ctx: &Context) -> Result<(), SerenityError> {
+		let opt_in = CreateCommand::new(OPT_IN).description("Start tracking 'x3's");
+		Command::create_global_command(&ctx, opt_in).await?;
+		println!("Registered {OPT_IN} command");
+
+		let opt_out = CreateCommand::new(OPT_OUT).description("Stop tracking 'x3's");
+		Command::create_global_command(&ctx, opt_out).await?;
+		println!("Registered {OPT_OUT} command");
+
+		let silent =
+			CreateCommand::new(SILENT).description("Track 'x3's silently (don't send messages)");
+		Command::create_global_command(&ctx, silent).await?;
+		println!("Registered {SILENT} command");
+
+		let verbose =
+			CreateCommand::new(VERBOSE).description("Track 'x3's verbosely (do send messages)");
+		Command::create_global_command(&ctx, verbose).await?;
+		println!("Registered {VERBOSE} command");
+
+		Ok(())
+	}
+}
+
 #[async_trait]
 impl EventHandler for Handler {
+	async fn ready(&self, ctx: Context, ready: Ready) {
+		// commands
+		if let Err(why) = self.register_commands(&ctx).await {
+			panic!("Could not register commands!\n{why}");
+		}
+
+		println!("{} is connected!", ready.user.name);
+	}
+
 	async fn message(&self, ctx: Context, msg: Message) {
 		if let Some(found) = self.general_regex.find(&msg.content) {
 			let emote = match self.specific_regex.find(found.as_str()) {
@@ -37,6 +75,12 @@ impl EventHandler for Handler {
 				Ok(Some(new_count)) => new_count,
 				Ok(None) => return,
 				Err(why) => return eprintln!("DB error: {why}"),
+			};
+
+			match self.db_handler.is_silent(msg.author.id.get()).await {
+				Ok(true) => return,
+				Err(why) => return eprintln!("DB error: {why}"),
+				_ => (),
 			};
 
 			let try_reply = msg
@@ -52,55 +96,44 @@ impl EventHandler for Handler {
 	}
 
 	async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
-		if let Interaction::Command(command) = interaction {
-			let content = match command.data.name.as_str() {
-				"opt_in" => {
-					if let Err(e) = self
-						.db_handler
-						.set_opt_out(command.user.id.get(), false)
-						.await
-					{
-						return eprintln!("DB error: {e}");
-					};
-					"I will count your ':3's now uwu"
-				}
-				"opt_out" => {
-					if let Err(e) = self
-						.db_handler
-						.set_opt_out(command.user.id.get(), true)
-						.await
-					{
-						return eprintln!("DB error: {e}");
-					};
-					"I won't count your ':3's now qwq"
-				}
-				_ => return,
-			};
+		let Interaction::Command(command) = interaction else {
+			return;
+		};
+		let user_id = command.user.id.get();
 
-			let data = CreateInteractionResponseMessage::new().content(content);
-			let builder = CreateInteractionResponse::Message(data);
-			if let Err(why) = command.create_response(&ctx.http, builder).await {
-				println!("Cannot respond to slash command: {why}");
+		let content = match command.data.name.as_str() {
+			OPT_IN => {
+				if let Err(e) = self.db_handler.set_opt_out(user_id, false).await {
+					return eprintln!("DB error: {e}");
+				};
+				"I will count your ':3's now uwu"
 			}
-		}
-	}
+			OPT_OUT => {
+				if let Err(e) = self.db_handler.set_opt_out(user_id, true).await {
+					return eprintln!("DB error: {e}");
+				};
+				"I won't count your ':3's now qwq"
+			}
+			SILENT => {
+				if let Err(e) = self.db_handler.set_silent(user_id, true).await {
+					return eprintln!("DB error: {e}");
+				};
+				"I won't respond to your messages but will still count 'x3's"
+			}
+			VERBOSE => {
+				if let Err(e) = self.db_handler.set_silent(user_id, false).await {
+					return eprintln!("DB error: {e}");
+				};
+				"I will now respond to your messages"
+			}
+			_ => return,
+		};
 
-	async fn ready(&self, ctx: Context, ready: Ready) {
-		// commands
-		let opt_in = CreateCommand::new("opt_in").description("Start tracking 'x3's");
-		if let Err(why) = Command::create_global_command(&ctx, opt_in).await {
-			return eprintln!("Error creating opt_in command: {why}");
-		} else {
-			println!("Registered opt_in command");
+		let data = CreateInteractionResponseMessage::new().content(content);
+		let builder = CreateInteractionResponse::Message(data);
+		if let Err(why) = command.create_response(&ctx.http, builder).await {
+			println!("Cannot respond to slash command: {why}");
 		}
-		let opt_out = CreateCommand::new("opt_out").description("Stop tracking 'x3's");
-		if let Err(why) = Command::create_global_command(&ctx, opt_out).await {
-			return eprintln!("Error creating opt_out command: {why}");
-		} else {
-			println!("Registered opt_out command");
-		}
-
-		println!("{} is connected!", ready.user.name);
 	}
 }
 

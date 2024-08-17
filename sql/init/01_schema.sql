@@ -21,7 +21,7 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: counter; Type: TABLE; Schema: public; Owner: x3_admin
+-- Name: counter; Type: TABLE; Schema: public; Owner: -
 --
 
 CREATE TABLE public.counter (
@@ -32,21 +32,19 @@ CREATE TABLE public.counter (
 );
 
 
-ALTER TABLE public.counter OWNER TO x3_admin;
-
 --
--- Name: opt_out; Type: TABLE; Schema: public; Owner: x3_admin
+-- Name: options; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.opt_out (
-    user_id text NOT NULL
+CREATE TABLE public.options (
+    user_id text NOT NULL,
+    opt_out boolean DEFAULT false NOT NULL,
+    silent boolean DEFAULT false NOT NULL
 );
 
 
-ALTER TABLE public.opt_out OWNER TO x3_admin;
-
 --
--- Name: counter counter_pkey; Type: CONSTRAINT; Schema: public; Owner: x3_admin
+-- Name: counter counter_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.counter
@@ -54,10 +52,10 @@ ALTER TABLE ONLY public.counter
 
 
 --
--- Name: opt_out opt_out_user_id_key; Type: CONSTRAINT; Schema: public; Owner: x3_admin
+-- Name: options opt_out_user_id_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.opt_out
+ALTER TABLE ONLY public.options
     ADD CONSTRAINT opt_out_user_id_key UNIQUE (user_id);
 
 
