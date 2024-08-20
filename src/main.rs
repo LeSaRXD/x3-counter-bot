@@ -11,7 +11,8 @@ use database::{DatabaseHandler, LeaderboardRow};
 use dotenv::dotenv;
 use regex::Regex;
 use serenity::all::{
-	Command, CommandInteraction, CreateAllowedMentions, CreateCommand, CreateInteractionResponse,
+	Command, CommandDataOptionValue, CommandInteraction, CommandOptionType, CreateAllowedMentions,
+	CreateCommand, CreateCommandOption, CreateInteractionResponse,
 	CreateInteractionResponseMessage, Interaction, InteractionResponseFlags,
 };
 use serenity::async_trait;
@@ -57,7 +58,17 @@ impl Handler {
 		Command::create_global_command(&ctx, counts).await?;
 		println!("Registered {COUNTS} command");
 
-		let leaderboard = CreateCommand::new(LEADERBOARD).description("Get the 'x3' leaderboard");
+		let count_arg = CreateCommandOption::new(
+			CommandOptionType::Integer,
+			"count",
+			"Max count of users per emote",
+		)
+		.required(false)
+		.min_int_value(1)
+		.max_int_value(5);
+		let leaderboard = CreateCommand::new(LEADERBOARD)
+			.description("Get the 'x3' leaderboard")
+			.add_option(count_arg);
 		Command::create_global_command(&ctx, leaderboard).await?;
 		println!("Registered {LEADERBOARD} command");
 
@@ -111,8 +122,18 @@ impl Handler {
 				CreateInteractionResponseMessage::new().content(content)
 			}
 			LEADERBOARD => {
+				let leaderboard = match cmd.data.options.as_slice() {
+					[] => self.db_handler.leaderboard(3).await?,
+					[arg, ..] => {
+						if let CommandDataOptionValue::Integer(count) = arg.value {
+							self.db_handler.leaderboard(count).await?
+						} else {
+							eprintln!("Argument {} has incorrect type", arg.name);
+							return Ok(None);
+						}
+					}
+				};
 				let mut emote_map: HashMap<Box<str>, Vec<LeaderboardRow>> = HashMap::new();
-				let leaderboard = self.db_handler.leaderboard(5).await?;
 				for row in leaderboard {
 					match emote_map.entry(row.emote.clone()) {
 						Entry::Occupied(mut o) => o.get_mut().push(row),

@@ -106,7 +106,7 @@ impl DatabaseHandler {
 		.await
 	}
 
-	pub async fn leaderboard(&self, top: u64) -> sqlx::Result<Vec<LeaderboardRow>> {
+	pub async fn leaderboard(&self, top: i64) -> sqlx::Result<Vec<LeaderboardRow>> {
 		sqlx::query_as!(
 			LeaderboardRow,
 			r#"WITH ranked AS (
