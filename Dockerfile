@@ -1,5 +1,5 @@
-FROM rust:1.79-slim-bullseye AS builder
-WORKDIR build/
+FROM rust:1-slim-bullseye AS builder
+WORKDIR /build
 
 # cache the compiled dependencies
 COPY Cargo.toml .
@@ -13,6 +13,6 @@ RUN cargo build --release
 
 
 FROM debian:bullseye-slim AS app
-WORKDIR bot/
+WORKDIR /bot
 COPY --from=builder /build/target/release/app /bot/app
 CMD ["./app"]
