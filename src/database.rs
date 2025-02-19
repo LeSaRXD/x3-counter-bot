@@ -4,7 +4,7 @@ use sqlx::PgPool;
 
 pub struct UserCount {
 	pub emote: Box<str>,
-	pub count: i32,
+	pub count: i64,
 }
 
 #[derive(Debug)]
@@ -30,19 +30,25 @@ impl DatabaseHandler {
 }
 
 impl DatabaseHandler {
-	pub async fn add_one(&self, user_id: u64, emote: &str) -> sqlx::Result<Option<i32>> {
+	pub async fn add_one(
+		&self,
+		user_id: u64,
+		server_id: u64,
+		emote: &str,
+	) -> sqlx::Result<Option<i32>> {
 		if self.is_opt_out(user_id).await? {
 			return Ok(None);
 		}
 		Ok(Some(
 			query!(
-				r#"INSERT INTO counter (user_id, emote, count) VALUES ($1, $2, 
-					(SELECT COALESCE((SELECT count FROM counter WHERE user_id=$1 and emote=$2), 0) + 1)
+				r#"INSERT INTO counter (user_id, server_id, emote, count) VALUES ($1, $2, $3,
+					(SELECT COALESCE((SELECT count FROM counter WHERE user_id=$1 AND server_id = $2 AND emote=$3), 0) + 1)
 				)
-				ON CONFLICT (user_id, emote) DO
+				ON CONFLICT (user_id, server_id, emote) DO
 				UPDATE SET count = EXCLUDED.count
 				RETURNING count"#,
 				user_id.to_string(),
+				server_id.to_string(),
 				emote.to_lowercase(),
 			)
 			.fetch_one(&self.pool)
@@ -53,7 +59,7 @@ impl DatabaseHandler {
 	pub async fn get_user_counts(&self, user_id: u64) -> sqlx::Result<Vec<UserCount>> {
 		sqlx::query_as!(
 			UserCount,
-			r#"SELECT emote, count FROM counter WHERE user_id = $1"#,
+			r#"SELECT emote, SUM(count) as "count!" FROM counter WHERE user_id = $1 GROUP BY emote"#,
 			user_id.to_string()
 		)
 		.fetch_all(&self.pool)
@@ -106,11 +112,13 @@ impl DatabaseHandler {
 		.await
 	}
 
-	pub async fn leaderboard(&self, top: i64) -> sqlx::Result<Vec<LeaderboardRow>> {
+	pub async fn leaderboard(&self, server_id: u64, top: i64) -> sqlx::Result<Vec<LeaderboardRow>> {
 		sqlx::query_as!(
 			LeaderboardRow,
 			r#"WITH ranked AS (
-				SELECT user_id, emote, count, DENSE_RANK() OVER (PARTITION BY emote ORDER BY count DESC) AS rank FROM counter
+				SELECT user_id, emote, count,
+				DENSE_RANK() OVER (PARTITION BY emote ORDER BY count DESC) AS rank
+				FROM counter WHERE server_id = $1
 			)
 			SELECT
 				emote,
@@ -118,8 +126,9 @@ impl DatabaseHandler {
 				count,
 				rank AS "rank!"
 			FROM ranked
-			WHERE rank <= $1
+			WHERE rank <= $2
 			ORDER BY emote, rank ASC"#,
+			server_id.to_string(),
 			top as i64,
 		)
 		.fetch_all(&self.pool)

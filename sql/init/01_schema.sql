@@ -26,6 +26,7 @@ SET default_table_access_method = heap;
 
 CREATE TABLE public.counter (
     user_id text NOT NULL,
+	server_id text NOT NULL,
     emote character(2) NOT NULL,
     count integer DEFAULT 0 NOT NULL,
     CONSTRAINT counter_count_check CHECK ((count > 0))
@@ -48,7 +49,7 @@ CREATE TABLE public.options (
 --
 
 ALTER TABLE ONLY public.counter
-    ADD CONSTRAINT counter_pkey PRIMARY KEY (user_id, emote);
+    ADD CONSTRAINT counter_pkey PRIMARY KEY (user_id, server_id, emote);
 
 
 --

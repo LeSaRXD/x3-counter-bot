@@ -22,8 +22,7 @@ use serenity::prelude::*;
 use sqlx::Pool;
 
 struct Handler {
-	general_regex: Regex,
-	specific_regex: Regex,
+	regex: Regex,
 	db_handler: DatabaseHandler,
 }
 
@@ -68,7 +67,8 @@ impl Handler {
 		.max_int_value(5);
 		let leaderboard = CreateCommand::new(LEADERBOARD)
 			.description("Get the 'x3' leaderboard")
-			.add_option(count_arg);
+			.add_option(count_arg)
+			.dm_permission(false);
 		Command::create_global_command(&ctx, leaderboard).await?;
 		println!("Registered {LEADERBOARD} command");
 
@@ -122,11 +122,16 @@ impl Handler {
 				CreateInteractionResponseMessage::new().content(content)
 			}
 			LEADERBOARD => {
+				let Some(server_id) = cmd.guild_id else {
+					return Ok(None);
+				};
+				let server_id = server_id.get();
+
 				let leaderboard = match cmd.data.options.as_slice() {
-					[] => self.db_handler.leaderboard(3).await?,
+					[] => self.db_handler.leaderboard(server_id, 3).await?,
 					[arg, ..] => {
 						if let CommandDataOptionValue::Integer(count) = arg.value {
-							self.db_handler.leaderboard(count).await?
+							self.db_handler.leaderboard(server_id, count).await?
 						} else {
 							eprintln!("Argument {} has incorrect type", arg.name);
 							return Ok(None);
@@ -176,19 +181,25 @@ impl EventHandler for Handler {
 	}
 
 	async fn message(&self, ctx: Context, msg: Message) {
-		if let Some(found) = self.general_regex.find(&msg.content) {
-			let emote = match self.specific_regex.find(found.as_str()) {
-				Some(res) => res.as_str(),
-				None => return eprintln!("Something is wrong with the regex!"),
-			};
+		let Some(server_id) = msg.guild_id else {
+			return;
+		};
+		let server_id = server_id.get();
+		let author_id = msg.author.id.get();
 
-			let new_count = match self.db_handler.add_one(msg.author.id.get(), emote).await {
+		if let Some(found) = self.regex.captures(&msg.content) {
+			let Some(emote) = found.get(0) else {
+				return;
+			};
+			let emote = emote.as_str();
+
+			let new_count = match self.db_handler.add_one(author_id, server_id, emote).await {
 				Ok(Some(new_count)) => new_count,
 				Ok(None) => return,
 				Err(why) => return eprintln!("DB error: {why}"),
 			};
 
-			match self.db_handler.is_silent(msg.author.id.get()).await {
+			match self.db_handler.is_silent(author_id).await {
 				Ok(true) => return,
 				Err(why) => return eprintln!("DB error: {why}"),
 				_ => (),
@@ -197,7 +208,7 @@ impl EventHandler for Handler {
 			let try_reply = msg
 				.reply(
 					&ctx,
-					format!("You have ended your message with '{emote}' **{new_count}** times!"),
+					format!("You have ended your message with '{emote}' **{new_count}** times!",),
 				)
 				.await;
 			if let Err(why) = try_reply {
@@ -235,8 +246,7 @@ async fn main() {
 	let db_handler = DatabaseHandler::new(pool);
 
 	// regex
-	let general = Regex::new(r#"[:;xX]3+c*$"#).unwrap();
-	let specific = Regex::new(r#"[:;xX]3"#).unwrap();
+	let regex = Regex::new(r#"([:;xX]3)3*c*$"#).unwrap();
 
 	// intents
 	let intents = GatewayIntents::GUILD_MESSAGES
@@ -244,11 +254,7 @@ async fn main() {
 		| GatewayIntents::MESSAGE_CONTENT;
 
 	// event handler
-	let handler = Handler {
-		general_regex: general,
-		specific_regex: specific,
-		db_handler,
-	};
+	let handler = Handler { regex, db_handler };
 
 	// client
 	let mut client = Client::builder(&token, intents)
