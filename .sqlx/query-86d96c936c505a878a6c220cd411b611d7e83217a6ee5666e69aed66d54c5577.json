@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO counter (user_id, server_id, emote, count) VALUES ($1, $2, $3,\n\t\t\t\t\t(SELECT COALESCE((SELECT count FROM counter WHERE user_id=$1 AND server_id = $2 AND emote=$3), 0) + 1)\n\t\t\t\t)\n\t\t\t\tON CONFLICT (user_id, server_id, emote) DO\n\t\t\t\tUPDATE SET count = EXCLUDED.count\n\t\t\t\tRETURNING count",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Bpchar"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "86d96c936c505a878a6c220cd411b611d7e83217a6ee5666e69aed66d54c5577"
+}
