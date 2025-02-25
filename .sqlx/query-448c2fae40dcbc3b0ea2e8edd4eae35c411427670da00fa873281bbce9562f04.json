@@ -1,0 +1,29 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT emote, SUM(count) as \"count!\" FROM counter WHERE user_id = $1 AND server_id = $2 GROUP BY emote",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "emote",
+        "type_info": "Bpchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "count!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      null
+    ]
+  },
+  "hash": "448c2fae40dcbc3b0ea2e8edd4eae35c411427670da00fa873281bbce9562f04"
+}
