@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::env;
 
 use database::{DatabaseHandler, LeaderboardRow};
-use dotenv::dotenv;
+use dotenvy::dotenv;
 use regex::Regex;
 use serenity::all::{
 	Command, CommandDataOptionValue, CommandInteraction, CommandOptionType, CreateAllowedMentions,
@@ -68,7 +68,7 @@ impl Handler {
 			Command::create_global_command(&ctx, counts),
 			Command::create_global_command(&ctx, leaderboard),
 		)?;
-		println!("Registered commands");
+		println!("Registered commands: {OPT_IN}, {OPT_OUT}, {SILENT}, {VERBOSE}, {COUNTS}, {LEADERBOARD}");
 		Ok(())
 	}
 
