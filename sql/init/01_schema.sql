@@ -40,7 +40,8 @@ CREATE TABLE public.counter (
 CREATE TABLE public.options (
     user_id text NOT NULL,
     opt_out boolean DEFAULT false NOT NULL,
-    silent boolean DEFAULT false NOT NULL
+    silent integer,
+    CONSTRAINT options_silent_check CHECK ((silent >= 0))
 );
 
 

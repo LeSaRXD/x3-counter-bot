@@ -7,7 +7,7 @@ use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::env;
 
-use database::{DatabaseHandler, LeaderboardRow};
+use database::{DatabaseHandler, LeaderboardRow, VerboseLevel};
 use dotenvy::dotenv;
 use regex::Regex;
 use serenity::all::{
@@ -35,14 +35,26 @@ const LEADERBOARD: &str = "leaderboard";
 const MUTE_ALL: &str = "mute_all";
 const UNMUTE_ALL: &str = "unmute_all";
 
+const COUNT_ARG: &str = "count";
+const SEND_ON_ARG: &str = "send_on";
+
 impl Handler {
 	async fn register_commands(&self, ctx: &Context) -> Result<(), SerenityError> {
 		let opt_in = CreateCommand::new(OPT_IN).description("Start tracking 'x3's");
 
 		let opt_out = CreateCommand::new(OPT_OUT).description("Stop tracking 'x3's");
 
-		let silent =
-			CreateCommand::new(SILENT).description("Track 'x3's silently (don't send messages)");
+		let repeat_arg = CreateCommandOption::new(
+			CommandOptionType::Integer,
+			SEND_ON_ARG,
+			"Send counts every nth message",
+		)
+		.required(false)
+		.min_int_value(2)
+		.max_int_value(i32::MAX as u64);
+		let silent = CreateCommand::new(SILENT)
+			.description("Track 'x3's silently (don't send messages)")
+			.add_option(repeat_arg);
 
 		let verbose =
 			CreateCommand::new(VERBOSE).description("Track 'x3's verbosely (do send messages)");
@@ -51,7 +63,7 @@ impl Handler {
 
 		let count_arg = CreateCommandOption::new(
 			CommandOptionType::Integer,
-			"count",
+			COUNT_ARG,
 			"Max count of users per emote",
 		)
 		.required(false)
@@ -115,14 +127,35 @@ impl Handler {
 					.flags(InteractionResponseFlags::EPHEMERAL)
 			}
 			SILENT => {
-				self.db_handler.set_silent(user_id, true).await?;
+				let content = match cmd.data.options.as_slice() {
+					[] => {
+						self.db_handler.set_silent(user_id, Some(0)).await?;
+						"I won't respond to your messages but will still count 'x3's".to_owned()
+					}
+					[arg, ..] => {
+						if let CommandDataOptionValue::Integer(count) = arg.value {
+							self.db_handler
+								.set_silent(user_id, Some(count as u32))
+								.await?;
+							let postfix = match count % 10 {
+								2 => "nd",
+								3 => "rd",
+								_ => "th",
+							};
+							format!("I will only respond to every {count}{postfix} 'x3'")
+						} else {
+							eprintln!("Argument {} has incorrect type", arg.name);
+							return Ok(None);
+						}
+					}
+				};
 
 				CreateInteractionResponseMessage::new()
-					.content("I won't respond to your messages but will still count 'x3's")
+					.content(content)
 					.flags(InteractionResponseFlags::EPHEMERAL)
 			}
 			VERBOSE => {
-				self.db_handler.set_silent(user_id, false).await?;
+				self.db_handler.set_silent(user_id, None).await?;
 				CreateInteractionResponseMessage::new()
 					.content("I will now respond to your messages")
 					.flags(InteractionResponseFlags::EPHEMERAL)
@@ -241,10 +274,15 @@ impl EventHandler for Handler {
 				Err(why) => return eprintln!("DB error: {why}"),
 			};
 
-			match self.db_handler.is_silent(author_id, server_id).await {
-				Ok(true) => return,
+			match self.db_handler.verbose_level(author_id, server_id).await {
+				Ok(VerboseLevel::Verbose) => (),
+				Ok(VerboseLevel::Silent) => return,
+				Ok(VerboseLevel::Every(every)) => {
+					if new_count % every.get() != 0 {
+						return;
+					}
+				}
 				Err(why) => return eprintln!("DB error: {why}"),
-				_ => (),
 			};
 
 			let try_reply = msg

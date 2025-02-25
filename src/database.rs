@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::{fmt::Display, num::NonZeroU32};
 
 use sqlx::PgPool;
 
@@ -20,6 +20,21 @@ impl Display for LeaderboardRow {
 	}
 }
 
+pub enum VerboseLevel {
+	Verbose,
+	Every(NonZeroU32),
+	Silent,
+}
+impl From<Option<i32>> for VerboseLevel {
+	fn from(value: Option<i32>) -> Self {
+		match value.map(|v| NonZeroU32::new(v as u32)) {
+			Some(Some(nonzero)) => Self::Every(nonzero),
+			Some(None) => Self::Silent,
+			None => Self::Verbose,
+		}
+	}
+}
+
 pub struct DatabaseHandler {
 	pool: PgPool,
 }
@@ -35,7 +50,7 @@ impl DatabaseHandler {
 		user_id: u64,
 		server_id: u64,
 		emote: &str,
-	) -> sqlx::Result<Option<i32>> {
+	) -> sqlx::Result<Option<u32>> {
 		if self.is_opt_out(user_id).await? {
 			return Ok(None);
 		}
@@ -53,7 +68,7 @@ impl DatabaseHandler {
 			)
 			.fetch_one(&self.pool)
 			.await?
-			.count,
+			.count as u32,
 		))
 	}
 	pub async fn get_user_counts(&self, user_id: u64) -> sqlx::Result<Vec<UserCount>> {
@@ -101,30 +116,32 @@ impl DatabaseHandler {
 		.await
 		.map(|_| ())
 	}
-	pub async fn set_silent(&self, user_id: u64, value: bool) -> sqlx::Result<()> {
+	pub async fn set_silent(&self, user_id: u64, value: Option<u32>) -> sqlx::Result<()> {
 		sqlx::query!(
 			r#"INSERT INTO options (user_id, silent) VALUES ($1, $2)
 			ON CONFLICT (user_id) DO UPDATE
 			SET silent = EXCLUDED.silent"#,
 			user_id.to_string(),
-			value,
+			value.map(|v| v as i32),
 		)
 		.execute(&self.pool)
 		.await
 		.map(|_| ())
 	}
-	pub async fn is_silent(&self, user_id: u64, server_id: u64) -> sqlx::Result<bool> {
+	pub async fn verbose_level(&self, user_id: u64, server_id: u64) -> sqlx::Result<VerboseLevel> {
 		sqlx::query_scalar!(
-			r#"SELECT EXISTS(
-				SELECT * FROM options WHERE user_id = $1 AND silent
-			) OR EXISTS(
-				SELECT * FROM server_options WHERE server_id = $2 AND mute_all
-			) AS "exists!""#,
-			user_id.to_string(),
+			r#"SELECT CASE
+				WHEN EXISTS(
+					SELECT * FROM server_options WHERE server_id = $1 AND mute_all
+				) THEN 0
+				ELSE (SELECT silent FROM options WHERE user_id = $2)
+			END"#,
 			server_id.to_string(),
+			user_id.to_string(),
 		)
 		.fetch_one(&self.pool)
 		.await
+		.map(Into::into)
 	}
 
 	pub async fn leaderboard(&self, server_id: u64, top: i64) -> sqlx::Result<Vec<LeaderboardRow>> {
