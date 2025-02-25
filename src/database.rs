@@ -89,6 +89,18 @@ impl DatabaseHandler {
 		.await
 	}
 
+	pub async fn set_mute_all(&self, server_id: u64, value: bool) -> sqlx::Result<()> {
+		sqlx::query!(
+			r#"INSERT INTO server_options (server_id, mute_all) VALUES ($1, $2)
+		ON CONFLICT (server_id) DO UPDATE
+		SET mute_all = EXCLUDED.mute_all"#,
+			server_id.to_string(),
+			value,
+		)
+		.execute(&self.pool)
+		.await
+		.map(|_| ())
+	}
 	pub async fn set_silent(&self, user_id: u64, value: bool) -> sqlx::Result<()> {
 		sqlx::query!(
 			r#"INSERT INTO options (user_id, silent) VALUES ($1, $2)
@@ -101,12 +113,15 @@ impl DatabaseHandler {
 		.await
 		.map(|_| ())
 	}
-	pub async fn is_silent(&self, user_id: u64) -> sqlx::Result<bool> {
+	pub async fn is_silent(&self, user_id: u64, server_id: u64) -> sqlx::Result<bool> {
 		sqlx::query_scalar!(
 			r#"SELECT EXISTS(
 				SELECT * FROM options WHERE user_id = $1 AND silent
+			) OR EXISTS(
+				SELECT * FROM server_options WHERE server_id = $2 AND mute_all
 			) AS "exists!""#,
 			user_id.to_string(),
+			server_id.to_string(),
 		)
 		.fetch_one(&self.pool)
 		.await

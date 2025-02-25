@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO server_options (server_id, mute_all) VALUES ($1, $2)\n\t\tON CONFLICT (server_id) DO UPDATE\n\t\tSET mute_all = EXCLUDED.mute_all",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Bool"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "7aeddc29a96c972e2ec93c8f037e37a984137d47a9274f1abcedaf78bd312a2a"
+}

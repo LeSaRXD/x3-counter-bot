@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 14.12 (Ubuntu 14.12-0ubuntu0.22.04.1)
--- Dumped by pg_dump version 14.12 (Ubuntu 14.12-0ubuntu0.22.04.1)
+-- Dumped from database version 14.15 (Ubuntu 14.15-0ubuntu0.22.04.1)
+-- Dumped by pg_dump version 14.15 (Ubuntu 14.15-0ubuntu0.22.04.1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -26,7 +26,7 @@ SET default_table_access_method = heap;
 
 CREATE TABLE public.counter (
     user_id text NOT NULL,
-	server_id text NOT NULL,
+    server_id text NOT NULL,
     emote character(2) NOT NULL,
     count integer DEFAULT 0 NOT NULL,
     CONSTRAINT counter_count_check CHECK ((count > 0))
@@ -45,6 +45,16 @@ CREATE TABLE public.options (
 
 
 --
+-- Name: server_options; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.server_options (
+    server_id text NOT NULL,
+    mute_all boolean DEFAULT false NOT NULL
+);
+
+
+--
 -- Name: counter counter_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -58,6 +68,14 @@ ALTER TABLE ONLY public.counter
 
 ALTER TABLE ONLY public.options
     ADD CONSTRAINT options_pkey PRIMARY KEY (user_id);
+
+
+--
+-- Name: server_options server_options_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.server_options
+    ADD CONSTRAINT server_options_pkey PRIMARY KEY (server_id);
 
 
 --

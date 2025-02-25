@@ -1,0 +1,23 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT EXISTS(\n\t\t\t\tSELECT * FROM options WHERE user_id = $1 AND silent\n\t\t\t) OR EXISTS(\n\t\t\t\tSELECT * FROM server_options WHERE server_id = $2 AND mute_all\n\t\t\t) AS \"exists!\"",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "exists!",
+        "type_info": "Bool"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": [
+      null
+    ]
+  },
+  "hash": "4e289116103739f9397fe867ecd4c23b427e9f9c9259ab140f279692cc06edd5"
+}

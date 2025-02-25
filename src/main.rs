@@ -13,7 +13,7 @@ use regex::Regex;
 use serenity::all::{
 	Command, CommandDataOptionValue, CommandInteraction, CommandOptionType, CreateAllowedMentions,
 	CreateCommand, CreateCommandOption, CreateInteractionResponse,
-	CreateInteractionResponseMessage, Interaction, InteractionResponseFlags,
+	CreateInteractionResponseMessage, Interaction, InteractionResponseFlags, Permissions,
 };
 use serenity::async_trait;
 use serenity::model::channel::Message;
@@ -32,6 +32,8 @@ const SILENT: &str = "silent";
 const VERBOSE: &str = "verbose";
 const COUNTS: &str = "counts";
 const LEADERBOARD: &str = "leaderboard";
+const MUTE_ALL: &str = "mute_all";
+const UNMUTE_ALL: &str = "unmute_all";
 
 impl Handler {
 	async fn register_commands(&self, ctx: &Context) -> Result<(), SerenityError> {
@@ -60,6 +62,16 @@ impl Handler {
 			.add_option(count_arg)
 			.dm_permission(false);
 
+		let mute_all = CreateCommand::new(MUTE_ALL)
+			.description("Mute all count messages in the server")
+			.default_member_permissions(Permissions::MANAGE_MESSAGES)
+			.dm_permission(false);
+
+		let unmute_all = CreateCommand::new(UNMUTE_ALL)
+			.description("Unmute all count messages in the server")
+			.default_member_permissions(Permissions::MANAGE_MESSAGES)
+			.dm_permission(false);
+
 		tokio::try_join!(
 			Command::create_global_command(&ctx, opt_in),
 			Command::create_global_command(&ctx, opt_out),
@@ -67,8 +79,20 @@ impl Handler {
 			Command::create_global_command(&ctx, verbose),
 			Command::create_global_command(&ctx, counts),
 			Command::create_global_command(&ctx, leaderboard),
+			Command::create_global_command(&ctx, mute_all),
+			Command::create_global_command(&ctx, unmute_all),
 		)?;
-		println!("Registered commands: {OPT_IN}, {OPT_OUT}, {SILENT}, {VERBOSE}, {COUNTS}, {LEADERBOARD}");
+		println!(
+			r#"Registered commands:
+{OPT_IN}
+{OPT_OUT}
+{SILENT}
+{VERBOSE}
+{COUNTS}
+{LEADERBOARD}
+{MUTE_ALL}
+{UNMUTE_ALL}"#
+		);
 		Ok(())
 	}
 
@@ -159,6 +183,27 @@ impl Handler {
 					.content(content)
 					.allowed_mentions(CreateAllowedMentions::new())
 			}
+			MUTE_ALL => {
+				let Some(server_id) = cmd.guild_id else {
+					return Ok(None);
+				};
+				let server_id = server_id.get();
+
+				self.db_handler.set_mute_all(server_id, true).await?;
+				CreateInteractionResponseMessage::new().content(
+					"I won't respond to messages in this server but will still count 'x3's",
+				)
+			}
+			UNMUTE_ALL => {
+				let Some(server_id) = cmd.guild_id else {
+					return Ok(None);
+				};
+				let server_id = server_id.get();
+
+				self.db_handler.set_mute_all(server_id, false).await?;
+				CreateInteractionResponseMessage::new()
+					.content("I will now respond to messages in this server")
+			}
 			_ => return Ok(None),
 		};
 
@@ -196,7 +241,7 @@ impl EventHandler for Handler {
 				Err(why) => return eprintln!("DB error: {why}"),
 			};
 
-			match self.db_handler.is_silent(author_id).await {
+			match self.db_handler.is_silent(author_id, server_id).await {
 				Ok(true) => return,
 				Err(why) => return eprintln!("DB error: {why}"),
 				_ => (),
