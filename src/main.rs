@@ -36,26 +36,16 @@ const LEADERBOARD: &str = "leaderboard";
 impl Handler {
 	async fn register_commands(&self, ctx: &Context) -> Result<(), SerenityError> {
 		let opt_in = CreateCommand::new(OPT_IN).description("Start tracking 'x3's");
-		Command::create_global_command(&ctx, opt_in).await?;
-		println!("Registered {OPT_IN} command");
 
 		let opt_out = CreateCommand::new(OPT_OUT).description("Stop tracking 'x3's");
-		Command::create_global_command(&ctx, opt_out).await?;
-		println!("Registered {OPT_OUT} command");
 
 		let silent =
 			CreateCommand::new(SILENT).description("Track 'x3's silently (don't send messages)");
-		Command::create_global_command(&ctx, silent).await?;
-		println!("Registered {SILENT} command");
 
 		let verbose =
 			CreateCommand::new(VERBOSE).description("Track 'x3's verbosely (do send messages)");
-		Command::create_global_command(&ctx, verbose).await?;
-		println!("Registered {VERBOSE} command");
 
 		let counts = CreateCommand::new(COUNTS).description("Get your 'x3' counts");
-		Command::create_global_command(&ctx, counts).await?;
-		println!("Registered {COUNTS} command");
 
 		let count_arg = CreateCommandOption::new(
 			CommandOptionType::Integer,
@@ -69,9 +59,16 @@ impl Handler {
 			.description("Get the 'x3' leaderboard")
 			.add_option(count_arg)
 			.dm_permission(false);
-		Command::create_global_command(&ctx, leaderboard).await?;
-		println!("Registered {LEADERBOARD} command");
 
+		tokio::try_join!(
+			Command::create_global_command(&ctx, opt_in),
+			Command::create_global_command(&ctx, opt_out),
+			Command::create_global_command(&ctx, silent),
+			Command::create_global_command(&ctx, verbose),
+			Command::create_global_command(&ctx, counts),
+			Command::create_global_command(&ctx, leaderboard),
+		)?;
+		println!("Registered commands");
 		Ok(())
 	}
 
