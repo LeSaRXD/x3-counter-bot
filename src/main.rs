@@ -161,7 +161,14 @@ impl Handler {
 					.flags(InteractionResponseFlags::EPHEMERAL)
 			}
 			COUNTS => {
-				let counts = self.db_handler.get_user_counts(user_id).await?;
+				let counts = match cmd.guild_id {
+					Some(server_id) => {
+						self.db_handler
+							.get_user_server_counts(user_id, server_id.get())
+							.await?
+					}
+					None => self.db_handler.get_user_counts(user_id).await?,
+				};
 				let content = match counts.as_slice() {
 					&[] => "You don't have any 'x3's yet :c".to_owned(),
 					counts => format!(

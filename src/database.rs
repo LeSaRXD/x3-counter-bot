@@ -80,6 +80,20 @@ impl DatabaseHandler {
 		.fetch_all(&self.pool)
 		.await
 	}
+	pub async fn get_user_server_counts(
+		&self,
+		user_id: u64,
+		server_id: u64,
+	) -> sqlx::Result<Vec<UserCount>> {
+		sqlx::query_as!(
+			UserCount,
+			r#"SELECT emote, SUM(count) as "count!" FROM counter WHERE user_id = $1 AND server_id = $2 GROUP BY emote"#,
+			user_id.to_string(),
+			server_id.to_string(),
+		)
+		.fetch_all(&self.pool)
+		.await
+	}
 
 	pub async fn set_opt_out(&self, user_id: u64, value: bool) -> sqlx::Result<()> {
 		sqlx::query!(
