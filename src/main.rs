@@ -188,7 +188,7 @@ impl EventHandler for Handler {
 		let author_id = msg.author.id.get();
 
 		if let Some(found) = self.regex.captures(&msg.content) {
-			let Some(emote) = found.get(0) else {
+			let Some(emote) = found.get(1) else {
 				return;
 			};
 			let emote = emote.as_str();
