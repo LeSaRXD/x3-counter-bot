@@ -51,7 +51,8 @@ CREATE TABLE public.options (
 
 CREATE TABLE public.server_options (
     server_id text NOT NULL,
-    mute_all boolean DEFAULT false NOT NULL
+    mute_all integer,
+    CONSTRAINT server_options_mute_all_check CHECK ((mute_all >= 0))
 );
 
 

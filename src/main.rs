@@ -13,7 +13,7 @@ use regex::Regex;
 use serenity::all::{
 	Command, CommandDataOptionValue, CommandInteraction, CommandOptionType, CreateAllowedMentions,
 	CreateCommand, CreateCommandOption, CreateInteractionResponse,
-	CreateInteractionResponseMessage, Interaction, InteractionResponseFlags, Permissions,
+	CreateInteractionResponseMessage, Interaction, Permissions,
 };
 use serenity::async_trait;
 use serenity::model::channel::Message;
@@ -38,6 +38,14 @@ const UNMUTE_ALL: &str = "unmute_all";
 const COUNT_ARG: &str = "count";
 const SEND_ON_ARG: &str = "send_on";
 
+fn postfix(count: i64) -> &'static str {
+	match count % 10 {
+		2 => "nd",
+		3 => "rd",
+		_ => "th",
+	}
+}
+
 impl Handler {
 	async fn register_commands(&self, ctx: &Context) -> Result<(), SerenityError> {
 		let opt_in = CreateCommand::new(OPT_IN).description("Start tracking 'x3's");
@@ -54,7 +62,7 @@ impl Handler {
 		.max_int_value(i32::MAX as u64);
 		let silent = CreateCommand::new(SILENT)
 			.description("Track 'x3's silently (don't send messages)")
-			.add_option(repeat_arg);
+			.add_option(repeat_arg.clone());
 
 		let verbose =
 			CreateCommand::new(VERBOSE).description("Track 'x3's verbosely (do send messages)");
@@ -76,6 +84,7 @@ impl Handler {
 
 		let mute_all = CreateCommand::new(MUTE_ALL)
 			.description("Mute all count messages in the server")
+			.add_option(repeat_arg)
 			.default_member_permissions(Permissions::MANAGE_MESSAGES)
 			.dm_permission(false);
 
@@ -118,13 +127,13 @@ impl Handler {
 				self.db_handler.set_opt_out(user_id, false).await?;
 				CreateInteractionResponseMessage::new()
 					.content("I will count your ':3's now UwU")
-					.flags(InteractionResponseFlags::EPHEMERAL)
+					.ephemeral(true)
 			}
 			OPT_OUT => {
 				self.db_handler.set_opt_out(user_id, true).await?;
 				CreateInteractionResponseMessage::new()
 					.content("I won't count your ':3's now qwq")
-					.flags(InteractionResponseFlags::EPHEMERAL)
+					.ephemeral(true)
 			}
 			SILENT => {
 				let content = match cmd.data.options.as_slice() {
@@ -137,12 +146,12 @@ impl Handler {
 							self.db_handler
 								.set_silent(user_id, Some(count as u32))
 								.await?;
-							let postfix = match count % 10 {
-								2 => "nd",
-								3 => "rd",
-								_ => "th",
-							};
-							format!("I will only respond to every {count}{postfix} 'x3'")
+
+							format!(
+								"I will only respond to every {}{} 'x3'",
+								count,
+								postfix(count)
+							)
 						} else {
 							eprintln!("Argument {} has incorrect type", arg.name);
 							return Ok(None);
@@ -152,13 +161,13 @@ impl Handler {
 
 				CreateInteractionResponseMessage::new()
 					.content(content)
-					.flags(InteractionResponseFlags::EPHEMERAL)
+					.ephemeral(true)
 			}
 			VERBOSE => {
 				self.db_handler.set_silent(user_id, None).await?;
 				CreateInteractionResponseMessage::new()
 					.content("I will now respond to your messages")
-					.flags(InteractionResponseFlags::EPHEMERAL)
+					.ephemeral(true)
 			}
 			COUNTS => {
 				let counts = match cmd.guild_id {
@@ -229,10 +238,33 @@ impl Handler {
 				};
 				let server_id = server_id.get();
 
-				self.db_handler.set_mute_all(server_id, true).await?;
-				CreateInteractionResponseMessage::new().content(
-					"I won't respond to messages in this server but will still count 'x3's",
-				)
+				let content = match cmd.data.options.as_slice() {
+					[] => {
+						self.db_handler.mute_all(server_id, Some(0)).await?;
+						"I won't respond to messages in this server but will still count 'x3's"
+							.to_owned()
+					}
+					[arg, ..] => {
+						if let CommandDataOptionValue::Integer(count) = arg.value {
+							self.db_handler
+								.mute_all(server_id, Some(count as u32))
+								.await?;
+
+							format!(
+								"I will only respond to every {}{} 'x3' in this server",
+								count,
+								postfix(count)
+							)
+						} else {
+							eprintln!("Argument {} has incorrect type", arg.name);
+							return Ok(None);
+						}
+					}
+				};
+
+				CreateInteractionResponseMessage::new()
+					.content(content)
+					.ephemeral(true)
 			}
 			UNMUTE_ALL => {
 				let Some(server_id) = cmd.guild_id else {
@@ -240,9 +272,10 @@ impl Handler {
 				};
 				let server_id = server_id.get();
 
-				self.db_handler.set_mute_all(server_id, false).await?;
+				self.db_handler.mute_all(server_id, None).await?;
 				CreateInteractionResponseMessage::new()
 					.content("I will now respond to messages in this server")
+					.ephemeral(true)
 			}
 			_ => return Ok(None),
 		};

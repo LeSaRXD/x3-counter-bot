@@ -118,13 +118,13 @@ impl DatabaseHandler {
 		.await
 	}
 
-	pub async fn set_mute_all(&self, server_id: u64, value: bool) -> sqlx::Result<()> {
+	pub async fn mute_all(&self, server_id: u64, value: Option<u32>) -> sqlx::Result<()> {
 		sqlx::query!(
 			r#"INSERT INTO server_options (server_id, mute_all) VALUES ($1, $2)
 		ON CONFLICT (server_id) DO UPDATE
 		SET mute_all = EXCLUDED.mute_all"#,
 			server_id.to_string(),
-			value,
+			value.map(|v| v as i32),
 		)
 		.execute(&self.pool)
 		.await
@@ -144,12 +144,7 @@ impl DatabaseHandler {
 	}
 	pub async fn verbose_level(&self, user_id: u64, server_id: u64) -> sqlx::Result<VerboseLevel> {
 		sqlx::query_scalar!(
-			r#"SELECT CASE
-				WHEN EXISTS(
-					SELECT * FROM server_options WHERE server_id = $1 AND mute_all
-				) THEN 0
-				ELSE (SELECT silent FROM options WHERE user_id = $2)
-			END"#,
+			r#"SELECT COALESCE((SELECT mute_all FROM server_options WHERE server_id = $1), (SELECT silent FROM options WHERE user_id = $2))"#,
 			server_id.to_string(),
 			user_id.to_string(),
 		)
