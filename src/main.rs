@@ -26,6 +26,8 @@ macro_rules! add_commands {
 	($($cmd:ident => $exec:ident), * $(,)?) => {
 		impl Handler {
 			async fn register_commands(&self, ctx: &Context) -> Result<(), SerenityError> {
+				println!("Registering commands...");
+
 				tokio::try_join!(
 					$(
 						Command::create_global_command(&ctx, $cmd::into_command())
@@ -86,7 +88,7 @@ impl EventHandler for Handler {
 		let author_id = msg.author.id.get();
 
 		if let Some(found) = self.regex.captures(&msg.content) {
-			let Some(emote) = found.get(1) else {
+			let Some(emote) = found.get(1).or_else(|| found.get(2)) else {
 				return;
 			};
 			let emote = emote.as_str();
@@ -111,7 +113,7 @@ impl EventHandler for Handler {
 			let try_reply = msg
 				.reply(
 					&ctx,
-					format!("You have ended your message with '{emote}' **{new_count}** times!",),
+					format!("You have ended your message with *{emote}* **{new_count}** times!",),
 				)
 				.await;
 			if let Err(why) = try_reply {
@@ -146,7 +148,7 @@ async fn main() {
 	let pool = Pool::connect(&db_url).await.unwrap();
 	let db_handler = DatabaseHandler::new(pool);
 
-	let regex = Regex::new(r#"([:;xX]3)3*c*$"#).unwrap();
+	let regex = Regex::new(include_str!("./regex.txt")).unwrap();
 
 	let intents = GatewayIntents::GUILD_MESSAGES
 		| GatewayIntents::DIRECT_MESSAGES

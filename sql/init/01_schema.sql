@@ -2,8 +2,8 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 14.15 (Ubuntu 14.15-0ubuntu0.22.04.1)
--- Dumped by pg_dump version 14.15 (Ubuntu 14.15-0ubuntu0.22.04.1)
+-- Dumped from database version 14.17 (Ubuntu 14.17-0ubuntu0.22.04.1)
+-- Dumped by pg_dump version 14.17 (Ubuntu 14.17-0ubuntu0.22.04.1)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -27,7 +27,7 @@ SET default_table_access_method = heap;
 CREATE TABLE public.counter (
     user_id text NOT NULL,
     server_id text NOT NULL,
-    emote character(2) NOT NULL,
+    emote character varying(4) NOT NULL,
     count integer DEFAULT 0 NOT NULL,
     CONSTRAINT counter_count_check CHECK ((count > 0))
 );
