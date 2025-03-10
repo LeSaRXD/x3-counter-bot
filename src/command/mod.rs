@@ -45,15 +45,18 @@ pub trait IntoCommand {
 	const NAME: &'static str;
 	const DESCRIPTION: &'static str;
 	const DM_PERMISSION: bool;
-	const PERMISSIONS: Permissions;
+	const PERMISSIONS: Option<Permissions>;
 	const ARGS: &'static [&'static dyn IntoCommandArg];
 
 	fn into_command() -> CreateCommand {
-		CreateCommand::new(Self::NAME)
+		let mut cmd = CreateCommand::new(Self::NAME)
 			.description(Self::DESCRIPTION)
 			.dm_permission(Self::DM_PERMISSION)
-			.default_member_permissions(Self::PERMISSIONS)
-			.set_options(Self::ARGS.iter().map(|arg| arg.to_arg()).collect())
+			.set_options(Self::ARGS.iter().map(|arg| arg.to_arg()).collect());
+		if let Some(permissions) = Self::PERMISSIONS {
+			cmd = cmd.default_member_permissions(permissions);
+		}
+		cmd
 	}
 }
 
@@ -65,7 +68,7 @@ macro_rules! command {
 			const NAME: &'static str = $name;
 			const DESCRIPTION: &'static str = $desc;
 			const DM_PERMISSION: bool = $dm_permission;
-			const PERMISSIONS: Permissions = $permissions;
+			const PERMISSIONS: Option<Permissions> = $permissions;
 			const ARGS: &'static [&'static dyn command::IntoCommandArg] = &[$(&$args), *];
 		}
 		impl core::fmt::Display for $type_name {
@@ -75,15 +78,15 @@ macro_rules! command {
 		}
 	};
 	($type_name: ident, $name:literal, $desc:literal, $dm_permission:literal, [$($args:expr), *]) => {
-		command!($type_name, $name, $desc, $dm_permission, Permissions::empty(), [$($args), *]);
+		command!($type_name, $name, $desc, $dm_permission, None, [$($args), *]);
 	};
 	($type_name: ident, $name:literal, $desc:literal, $dm_permission:literal, $permissions:expr) => {
 		command!($type_name, $name, $desc, $dm_permission, $permissions, []);
 	};
 	($type_name: ident, $name:literal, $desc:literal, [$($args:expr), *]) => {
-		command!($type_name, $name, $desc, true, Permissions::empty(), [$($args), *]);
+		command!($type_name, $name, $desc, true, None, [$($args), *]);
 	};
 	($type_name: ident, $name:literal, $desc:literal) => {
-		command!($type_name, $name, $desc, true, Permissions::empty(), []);
+		command!($type_name, $name, $desc, true, None, []);
 	};
 }

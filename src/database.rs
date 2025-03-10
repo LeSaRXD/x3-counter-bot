@@ -56,11 +56,9 @@ impl DatabaseHandler {
 		}
 		Ok(Some(
 			query!(
-				r#"INSERT INTO counter (user_id, server_id, emote, count) VALUES ($1, $2, $3,
-					(SELECT COALESCE((SELECT count FROM counter WHERE user_id=$1 AND server_id = $2 AND emote=$3), 0) + 1)
-				)
+				r#"INSERT INTO counter (user_id, server_id, emote, count) VALUES ($1, $2, $3, 1)
 				ON CONFLICT (user_id, server_id, emote) DO
-				UPDATE SET count = EXCLUDED.count
+				UPDATE SET count = counter.count + 1
 				RETURNING count"#,
 				user_id.to_string(),
 				server_id.to_string(),

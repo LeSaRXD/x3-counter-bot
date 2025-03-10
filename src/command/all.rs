@@ -212,7 +212,7 @@ command!(
 	"mute_all",
 	"Mute all count messages in the server",
 	false,
-	Permissions::MANAGE_MESSAGES,
+	Some(Permissions::MANAGE_MESSAGES),
 	[REPEAT_ARG]
 );
 pub async fn mute_all(
@@ -248,16 +248,12 @@ pub async fn mute_all(
 	response!(content)
 }
 
-// 		let unmute_all = CreateCommand::new(UNMUTE_ALL)
-// 			.description("Unmute all count messages in the server")
-// 			.default_member_permissions(Permissions::MANAGE_MESSAGES)
-// 			.dm_permission(false);
 command!(
 	UnmuteAllCommand,
 	"unmute_all",
 	"Unmute all count messages in the server",
 	false,
-	Permissions::MANAGE_MESSAGES
+	Some(Permissions::MANAGE_MESSAGES)
 );
 pub async fn unmute_all(
 	db: &DatabaseHandler,

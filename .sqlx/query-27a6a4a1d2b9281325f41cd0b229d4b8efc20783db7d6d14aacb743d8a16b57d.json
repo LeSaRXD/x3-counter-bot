@@ -1,0 +1,24 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO counter (user_id, server_id, emote, count) VALUES ($1, $2, $3, 1)\n\t\t\t\tON CONFLICT (user_id, server_id, emote) DO\n\t\t\t\tUPDATE SET count = counter.count + 1\n\t\t\t\tRETURNING count",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "count",
+        "type_info": "Int4"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text",
+        "Text",
+        "Varchar"
+      ]
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "27a6a4a1d2b9281325f41cd0b229d4b8efc20783db7d6d14aacb743d8a16b57d"
+}
