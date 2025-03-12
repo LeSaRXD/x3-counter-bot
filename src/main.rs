@@ -30,7 +30,7 @@ macro_rules! add_commands {
 				println!("Registering commands...");
 
 				let old_commands = Command::get_global_commands(&ctx).await.unwrap_or_default();
-				let old_commands: HashMap<_, _> = old_commands
+				let mut old_commands: HashMap<_, _> = old_commands
 					.into_iter()
 					.map(|cmd| (cmd.name.to_owned(), cmd))
 					.collect();
@@ -39,8 +39,8 @@ macro_rules! add_commands {
 				let mut handles = Vec::new();
 				$(
 					match old_commands
-						.get($cmd::NAME)
-						.map(|old_cmd| (&$cmd == old_cmd, old_cmd))
+						.remove($cmd::NAME)
+						.map(|old_cmd| ($cmd == old_cmd, old_cmd))
 					{
 						None => {
 							println!("Command {} does not exist, creating..", $cmd);
@@ -73,6 +73,26 @@ macro_rules! add_commands {
 						Ok(Ok(cmd)) => println!("Registered command {}", cmd.name),
 					};
 				}
+
+				let unused_commands: Vec<_> = old_commands.into_values().collect();
+				let mut handles = Vec::new();
+				for unused_command in unused_commands {
+					let ctx = ctx.to_owned();
+					handles.push(
+						tokio::spawn(async move {
+							Command::delete_global_command(ctx, unused_command.id).await?;
+							Ok(unused_command.name)
+						})
+					);
+				}
+				for handle in handles {
+					match handle.await {
+						Err(why) => panic!("Future could not complete\n{why}"),
+						Ok(Err(why)) => return Err(why),
+						Ok(Ok(cmd)) => println!("Deleted unused command {cmd}"),
+					};
+				}
+
 				Ok(())
 			}
 
