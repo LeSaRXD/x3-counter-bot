@@ -6,11 +6,12 @@ use serenity::all::{
 };
 
 use crate::{
-	arg, command,
+	arg,
+	command::command,
 	database::{DatabaseHandler, LeaderboardRow},
 };
 
-use super::IntArg;
+use super::args::{IntArg, IntoCommandArg};
 
 fn postfix(count: i64) -> &'static str {
 	match count % 10 {
@@ -212,7 +213,7 @@ command!(
 	"mute_all",
 	"Mute all count messages in the server",
 	false,
-	Some(Permissions::MANAGE_MESSAGES),
+	Permissions::MANAGE_MESSAGES,
 	[REPEAT_ARG]
 );
 pub async fn mute_all(
@@ -253,7 +254,7 @@ command!(
 	"unmute_all",
 	"Unmute all count messages in the server",
 	false,
-	Some(Permissions::MANAGE_MESSAGES)
+	Permissions::MANAGE_MESSAGES
 );
 pub async fn unmute_all(
 	db: &DatabaseHandler,

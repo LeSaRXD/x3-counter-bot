@@ -4,6 +4,7 @@ mod database;
 #[macro_use]
 extern crate sqlx;
 
+use std::collections::HashMap;
 use std::env;
 
 use command::{all::*, IntoCommand};
@@ -28,17 +29,50 @@ macro_rules! add_commands {
 			async fn register_commands(&self, ctx: &Context) -> Result<(), SerenityError> {
 				println!("Registering commands...");
 
-				tokio::try_join!(
-					$(
-						Command::create_global_command(&ctx, $cmd::into_command())
-					), *
-				)?;
+				let old_commands = Command::get_global_commands(&ctx).await.unwrap_or_default();
+				let old_commands: HashMap<_, _> = old_commands
+					.into_iter()
+					.map(|cmd| (cmd.name.to_owned(), cmd))
+					.collect();
+				println!("Got {} old commands", old_commands.len());
 
-				println!("Registered commands:");
+				let mut handles = Vec::new();
 				$(
-					println!("{}", $cmd);
+					match old_commands
+						.get($cmd::NAME)
+						.map(|old_cmd| (&$cmd == old_cmd, old_cmd))
+					{
+						None => {
+							println!("Command {} does not exist, creating..", $cmd);
+							handles.push(tokio::spawn(Command::create_global_command(
+								ctx.to_owned(),
+								$cmd::into_command(),
+							)));
+						}
+						Some((false, old_cmd)) => {
+							println!("Command {} was modified, editing..", $cmd);
+							handles.push(tokio::spawn(Command::edit_global_command(
+								ctx.to_owned(),
+								old_cmd.id,
+								$cmd::into_command(),
+							)));
+						}
+						Some((true, _)) => {
+							println!(
+								"Command {} was not modified, keeping the same",
+								$cmd
+							);
+						}
+					}
 				)*
 
+				for handle in handles {
+					match handle.await {
+						Err(why) => panic!("Future could not complete\n{why}"),
+						Ok(Err(why)) => return Err(why),
+						Ok(Ok(cmd)) => println!("Registered command {}", cmd.name),
+					};
+				}
 				Ok(())
 			}
 

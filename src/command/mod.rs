@@ -1,32 +1,7 @@
 pub mod all;
+pub mod args;
 
-use serenity::all::{CommandOptionType, CreateCommand, CreateCommandOption, Permissions};
-
-pub trait IntoCommandArg {
-	fn to_arg(&self) -> CreateCommandOption;
-}
-pub struct IntArg {
-	pub name: &'static str,
-	pub description: &'static str,
-	pub required: bool,
-	pub min: Option<u64>,
-	pub max: Option<u64>,
-}
-
-impl IntoCommandArg for IntArg {
-	fn to_arg(&self) -> CreateCommandOption {
-		let mut option =
-			CreateCommandOption::new(CommandOptionType::Integer, self.name, self.description)
-				.required(self.required);
-		if let Some(min) = self.min {
-			option = option.min_int_value(min);
-		}
-		if let Some(max) = self.max {
-			option = option.max_int_value(max);
-		}
-		option
-	}
-}
+use serenity::all::{Command, CreateCommand};
 
 #[macro_export]
 macro_rules! arg {
@@ -41,52 +16,81 @@ macro_rules! arg {
 	};
 }
 
-pub trait IntoCommand {
+pub trait IntoCommand: PartialEq<Command> {
 	const NAME: &'static str;
-	const DESCRIPTION: &'static str;
-	const DM_PERMISSION: bool;
-	const PERMISSIONS: Option<Permissions>;
-	const ARGS: &'static [&'static dyn IntoCommandArg];
-
-	fn into_command() -> CreateCommand {
-		let mut cmd = CreateCommand::new(Self::NAME)
-			.description(Self::DESCRIPTION)
-			.dm_permission(Self::DM_PERMISSION)
-			.set_options(Self::ARGS.iter().map(|arg| arg.to_arg()).collect());
-		if let Some(permissions) = Self::PERMISSIONS {
-			cmd = cmd.default_member_permissions(permissions);
-		}
-		cmd
-	}
+	fn into_command() -> CreateCommand;
 }
 
-#[macro_export]
-macro_rules! command {
-	($type_name: ident, $name:literal, $desc:literal, $dm_permission:literal, $permissions:expr, [$($args:expr), *]) => {
+#[doc(hidden)]
+macro_rules! command_inner {
+	($type_name:ident, $name:literal, $desc:literal, $dm_permission:literal, $permissions:expr, $args:expr) => {
 		pub struct $type_name;
-		impl command::IntoCommand for $type_name {
-			const NAME: &'static str = $name;
-			const DESCRIPTION: &'static str = $desc;
-			const DM_PERMISSION: bool = $dm_permission;
-			const PERMISSIONS: Option<Permissions> = $permissions;
-			const ARGS: &'static [&'static dyn command::IntoCommandArg] = &[$(&$args), *];
+
+		impl PartialEq<serenity::all::Command> for $type_name {
+			fn eq(&self, other: &serenity::all::Command) -> bool {
+				other.dm_permission == Some($dm_permission)
+					&& other.default_member_permissions == $permissions
+					&& other.name == $name
+					&& other.description == $desc
+					&& {
+						if other.options.len() != $args.len() {
+							false
+						} else {
+							let old_args = other
+								.options
+								.iter()
+								.map(|arg| (arg.name.to_owned(), arg))
+								.collect::<HashMap<_, _>>();
+							$args.iter().all(|new_arg| {
+								old_args
+									.get(new_arg.name())
+									.map(|old_arg| new_arg == old_arg)
+									.unwrap_or(false)
+							})
+						}
+					}
+			}
 		}
+
+		impl $crate::command::IntoCommand for $type_name {
+			const NAME: &'static str = $name;
+
+			fn into_command() -> serenity::all::CreateCommand {
+				let mut cmd = serenity::all::CreateCommand::new($name)
+					.description($desc)
+					.dm_permission($dm_permission)
+					.set_options($args.iter().map(|arg| arg.to_arg()).collect());
+				if let Some(permissions) = $permissions {
+					cmd = cmd.default_member_permissions(permissions);
+				}
+				cmd
+			}
+		}
+
 		impl core::fmt::Display for $type_name {
 			fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
 				f.write_str($name)
 			}
 		}
 	};
-	($type_name: ident, $name:literal, $desc:literal, $dm_permission:literal, [$($args:expr), *]) => {
-		command!($type_name, $name, $desc, $dm_permission, None, [$($args), *]);
+}
+pub(in crate::command) use command_inner;
+
+macro_rules! command {
+	($type_name:ident, $name:literal, $desc:literal, $dm_permission:literal, $permissions:expr, [$($args:expr), *]) => {
+		$crate::command::command_inner!($type_name, $name, $desc, $dm_permission, Some($permissions), &[$(&$args as &dyn IntoCommandArg), *]);
 	};
-	($type_name: ident, $name:literal, $desc:literal, $dm_permission:literal, $permissions:expr) => {
-		command!($type_name, $name, $desc, $dm_permission, $permissions, []);
+	($type_name:ident, $name:literal, $desc:literal, $dm_permission:literal, [$($args:expr), *]) => {
+		$crate::command::command_inner!($type_name, $name, $desc, $dm_permission, None::<Permissions>, &[$(&$args as &dyn IntoCommandArg), *]);
 	};
-	($type_name: ident, $name:literal, $desc:literal, [$($args:expr), *]) => {
-		command!($type_name, $name, $desc, true, None, [$($args), *]);
+	($type_name:ident, $name:literal, $desc:literal, $dm_permission:literal, $permissions:expr) => {
+		$crate::command::command_inner!($type_name, $name, $desc, $dm_permission, Some($permissions), &[] as &[&dyn IntoCommandArg]);
 	};
-	($type_name: ident, $name:literal, $desc:literal) => {
-		command!($type_name, $name, $desc, true, None, []);
+	($type_name:ident, $name:literal, $desc:literal, [$($args:expr), *]) => {
+		$crate::command::command_inner!($type_name, $name, $desc, true, None::<Permissions>, &[$(&$args as &dyn IntoCommandArg), *]);
+	};
+	($type_name:ident, $name:literal, $desc:literal) => {
+		$crate::command::command_inner!($type_name, $name, $desc, true, None::<Permissions>, &[] as &[&dyn IntoCommandArg]);
 	};
 }
+pub(crate) use command;

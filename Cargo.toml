@@ -14,4 +14,4 @@ dotenvy = "0.15.7"
 regex = "1.11.1"
 serenity = "0.12.4"
 sqlx = { version = "0.8.3", features = ["postgres", "runtime-tokio"] }
-tokio = { version = "1.43.0", features = ["rt-multi-thread"] }
+tokio = { version = "1.44.0", features = ["rt-multi-thread"] }
