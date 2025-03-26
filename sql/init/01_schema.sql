@@ -2,12 +2,13 @@
 -- PostgreSQL database dump
 --
 
--- Dumped from database version 14.17 (Ubuntu 14.17-0ubuntu0.22.04.1)
--- Dumped by pg_dump version 14.17 (Ubuntu 14.17-0ubuntu0.22.04.1)
+-- Dumped from database version 17.4 (Ubuntu 17.4-1.pgdg24.04+2)
+-- Dumped by pg_dump version 17.4 (Ubuntu 17.4-1.pgdg24.04+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -25,9 +26,9 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE public.counter (
-    user_id text NOT NULL,
-    server_id text NOT NULL,
-    emote character varying(4) NOT NULL,
+    user_id character(20) NOT NULL,
+    server_id character(20) NOT NULL,
+    emote text NOT NULL,
     count integer DEFAULT 0 NOT NULL,
     CONSTRAINT counter_count_check CHECK ((count > 0))
 );
@@ -38,7 +39,7 @@ CREATE TABLE public.counter (
 --
 
 CREATE TABLE public.options (
-    user_id text NOT NULL,
+    user_id character(20) NOT NULL,
     opt_out boolean DEFAULT false NOT NULL,
     silent integer,
     CONSTRAINT options_silent_check CHECK ((silent >= 0))
@@ -50,7 +51,7 @@ CREATE TABLE public.options (
 --
 
 CREATE TABLE public.server_options (
-    server_id text NOT NULL,
+    server_id character(20) NOT NULL,
     mute_all integer,
     CONSTRAINT server_options_mute_all_check CHECK ((mute_all >= 0))
 );

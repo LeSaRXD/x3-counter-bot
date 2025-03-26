@@ -10,4 +10,5 @@ RUN cargo build --release
 FROM debian:bullseye-slim AS app
 WORKDIR /bot
 COPY --from=builder /build/target/release/app /bot/app
+COPY --from=builder /build/regex.txt /bot/regex.txt
 CMD ["./app"]

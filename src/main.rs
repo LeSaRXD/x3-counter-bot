@@ -17,9 +17,12 @@ use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 use sqlx::Pool;
+use tokio::fs::File;
+use tokio::io::AsyncReadExt;
 
 struct Handler {
 	regex: Regex,
+	regex_captures: usize,
 	db_handler: DatabaseHandler,
 }
 
@@ -144,8 +147,8 @@ impl EventHandler for Handler {
 		let server_id = server_id.get();
 		let author_id = msg.author.id.get();
 
-		if let Some(found) = self.regex.captures(&msg.content) {
-			let Some(emote) = found.get(1).or_else(|| found.get(2)) else {
+		if let Some(found) = self.regex.captures(&msg.content.to_lowercase()) {
+			let Some(emote) = (1..=self.regex_captures).flat_map(|i| found.get(i)).next() else {
 				return;
 			};
 			let emote = emote.as_str();
@@ -205,13 +208,26 @@ async fn main() {
 	let pool = Pool::connect(&db_url).await.unwrap();
 	let db_handler = DatabaseHandler::new(pool);
 
-	let regex = Regex::new(include_str!("./regex.txt")).unwrap();
+	let mut regex = String::new();
+	File::open("regex.txt")
+		.await
+		.expect("Expected regex.txt to exist")
+		.read_to_string(&mut regex)
+		.await
+		.expect("Expected to read file regex.txt");
+	let regex_captures = regex.chars().filter(|c| *c == '(').count();
+	let regex = Regex::new(&regex).expect("Expected a valid regex expression");
 
 	let intents = GatewayIntents::GUILD_MESSAGES
 		| GatewayIntents::DIRECT_MESSAGES
 		| GatewayIntents::MESSAGE_CONTENT;
 
-	let handler = Handler { regex, db_handler };
+	println!("{regex_captures}");
+	let handler = Handler {
+		regex,
+		regex_captures,
+		db_handler,
+	};
 
 	let mut client = Client::builder(&token, intents)
 		.event_handler(handler)

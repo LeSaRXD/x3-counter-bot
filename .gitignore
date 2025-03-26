@@ -1,4 +1,5 @@
 /target
 .env
+regex.txt
 
 sql/data/
