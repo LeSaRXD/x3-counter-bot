@@ -175,7 +175,7 @@ pub async fn leaderboard(
 	let server_id = server_id.get();
 
 	let leaderboard = match cmd.data.options.as_slice() {
-		[] => db.leaderboard(server_id, 3).await?,
+		[] => db.leaderboard(server_id, 3i64).await?,
 		[arg, ..] => {
 			if let CommandDataOptionValue::Integer(count) = arg.value {
 				db.leaderboard(server_id, count).await?

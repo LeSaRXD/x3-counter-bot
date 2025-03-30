@@ -6,7 +6,7 @@
       {
         "ordinal": 0,
         "name": "emote",
-        "type_info": "Varchar"
+        "type_info": "Text"
       },
       {
         "ordinal": 1,
@@ -16,7 +16,7 @@
     ],
     "parameters": {
       "Left": [
-        "Text"
+        "Int8"
       ]
     },
     "nullable": [

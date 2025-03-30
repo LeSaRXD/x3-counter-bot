@@ -26,8 +26,8 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE public.counter (
-    user_id character(20) NOT NULL,
-    server_id character(20) NOT NULL,
+    user_id bigint NOT NULL,
+    server_id bigint NOT NULL,
     emote text NOT NULL,
     count integer DEFAULT 0 NOT NULL,
     CONSTRAINT counter_count_check CHECK ((count > 0))
@@ -39,7 +39,7 @@ CREATE TABLE public.counter (
 --
 
 CREATE TABLE public.options (
-    user_id character(20) NOT NULL,
+    user_id bigint NOT NULL,
     opt_out boolean DEFAULT false NOT NULL,
     silent integer,
     CONSTRAINT options_silent_check CHECK ((silent >= 0))
@@ -51,7 +51,7 @@ CREATE TABLE public.options (
 --
 
 CREATE TABLE public.server_options (
-    server_id character(20) NOT NULL,
+    server_id bigint NOT NULL,
     mute_all integer,
     CONSTRAINT server_options_mute_all_check CHECK ((mute_all >= 0))
 );
@@ -63,22 +63,6 @@ CREATE TABLE public.server_options (
 
 ALTER TABLE ONLY public.counter
     ADD CONSTRAINT counter_pkey PRIMARY KEY (user_id, server_id, emote);
-
-
---
--- Name: options options_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.options
-    ADD CONSTRAINT options_pkey PRIMARY KEY (user_id);
-
-
---
--- Name: server_options server_options_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.server_options
-    ADD CONSTRAINT server_options_pkey PRIMARY KEY (server_id);
 
 
 --

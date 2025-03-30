@@ -222,7 +222,6 @@ async fn main() {
 		| GatewayIntents::DIRECT_MESSAGES
 		| GatewayIntents::MESSAGE_CONTENT;
 
-	println!("{regex_captures}");
 	let handler = Handler {
 		regex,
 		regex_captures,
