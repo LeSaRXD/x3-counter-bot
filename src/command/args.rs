@@ -4,6 +4,7 @@ pub trait IntoCommandArg: PartialEq<CommandOption> {
 	fn name(&self) -> &str;
 	fn to_arg(&self) -> CreateCommandOption;
 }
+
 #[derive(Debug, Clone)]
 pub struct IntArg {
 	pub name: &'static str,
@@ -40,5 +41,32 @@ impl IntoCommandArg for IntArg {
 			option = option.max_int_value(max);
 		}
 		option
+	}
+}
+
+#[derive(Debug, Clone)]
+pub struct UserArg {
+	pub name: &'static str,
+	pub description: &'static str,
+	pub required: bool,
+}
+
+impl PartialEq<CommandOption> for UserArg {
+	fn eq(&self, other: &CommandOption) -> bool {
+		other.kind == CommandOptionType::User
+			&& other.required == self.required
+			&& other.name == self.name
+			&& other.description == self.description
+	}
+}
+
+impl IntoCommandArg for UserArg {
+	fn name(&self) -> &str {
+		self.name
+	}
+
+	fn to_arg(&self) -> CreateCommandOption {
+		CreateCommandOption::new(CommandOptionType::User, self.name, self.description)
+			.required(self.required)
 	}
 }

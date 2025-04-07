@@ -14,6 +14,13 @@ macro_rules! arg {
 			max: $max,
 		}
 	};
+	(User, $name:literal, $desc:literal, $required:literal) => {
+		UserArg {
+			name: $name,
+			description: $desc,
+			required: $required,
+		}
+	};
 }
 
 pub trait IntoCommand: PartialEq<Command> {
@@ -41,7 +48,7 @@ macro_rules! command_inner {
 								.iter()
 								.map(|arg| (arg.name.to_owned(), arg))
 								.collect::<HashMap<_, _>>();
-							$args.iter().all(|new_arg| {
+							$args.iter().all(|new_arg: &&dyn IntoCommandArg| {
 								old_args
 									.get(new_arg.name())
 									.map(|old_arg| new_arg == old_arg)
@@ -59,7 +66,12 @@ macro_rules! command_inner {
 				let mut cmd = serenity::all::CreateCommand::new($name)
 					.description($desc)
 					.dm_permission($dm_permission)
-					.set_options($args.iter().map(|arg| arg.to_arg()).collect());
+					.set_options(
+						$args
+							.iter()
+							.map(|arg: &&dyn IntoCommandArg| arg.to_arg())
+							.collect(),
+					);
 				if let Some(permissions) = $permissions {
 					cmd = cmd.default_member_permissions(permissions);
 				}
@@ -87,7 +99,7 @@ macro_rules! command {
 		$crate::command::command_inner!($type_name, $name, $desc, $dm_permission, Some($permissions), &[] as &[&dyn IntoCommandArg]);
 	};
 	($type_name:ident, $name:literal, $desc:literal, [$($args:expr), *]) => {
-		$crate::command::command_inner!($type_name, $name, $desc, true, None::<Permissions>, &[$(&$args as &dyn IntoCommandArg), *]);
+		$crate::command::command_inner!($type_name, $name, $desc, true, None::<Permissions>, &[$(&$args as &dyn IntoCommandArg), *] as &[&dyn IntoCommandArg]);
 	};
 	($type_name:ident, $name:literal, $desc:literal) => {
 		$crate::command::command_inner!($type_name, $name, $desc, true, None::<Permissions>, &[] as &[&dyn IntoCommandArg]);

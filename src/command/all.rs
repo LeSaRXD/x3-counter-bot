@@ -11,7 +11,7 @@ use crate::{
 	database::{DatabaseHandler, LeaderboardRow},
 };
 
-use super::args::{IntArg, IntoCommandArg};
+use super::args::{IntArg, IntoCommandArg, UserArg};
 
 fn postfix(count: i64) -> &'static str {
 	match count % 10 {
@@ -59,6 +59,8 @@ const LEADERBOARD_COUNT_ARG: IntArg = arg!(
 	Some(1),
 	Some(5)
 );
+
+const COUNTS_USER_ARG: UserArg = arg!(User, "user", "The user whose counts to display", false);
 
 command!(OptInCommand, "opt_in", "Start tracking x3s");
 pub async fn opt_in(
@@ -133,27 +135,55 @@ pub async fn verbose(
 	response!("I will now respond to your messages")
 }
 
-command!(CountsCommand, "counts", "Get your x3 counts");
+command!(
+	CountsCommand,
+	"counts",
+	"Get your x3 counts",
+	[COUNTS_USER_ARG]
+);
 pub async fn counts(
 	db: &DatabaseHandler,
 	cmd: &CommandInteraction,
 ) -> sqlx::Result<CreateInteractionResponseMessage> {
 	let user_id = cmd.user.id.get();
 
+	let user_arg = match cmd.data.options.as_slice() {
+		[] => None,
+		[arg, ..] => {
+			if let CommandDataOptionValue::User(user_arg_id) = arg.value {
+				Some(user_arg_id.get())
+			} else {
+				eprintln!("Argument {} has incorrect type", arg.name);
+				return response!(argument error);
+			}
+		}
+	};
+
+	let query_user_id = user_arg.unwrap_or(user_id);
+
 	let counts = match cmd.guild_id {
-		Some(server_id) => db.get_user_server_counts(user_id, server_id.get()).await?,
+		Some(server_id) => {
+			db.get_user_server_counts(query_user_id, server_id.get())
+				.await?
+		}
 		None => db.get_user_counts(user_id).await?,
 	};
-	let content = match counts.as_slice() {
-		&[] => "You don't have any x3s yet :c".to_owned(),
-		counts => format!(
-			"Here are your counts:\n{}",
-			counts
+
+	let content = match (counts.as_slice(), user_id == query_user_id) {
+		(&[], true) => "You don't have any x3s yet :c".to_owned(),
+		(&[], false) => "This user doesn't have any x3s yet :c".to_owned(),
+		(counts, is_user) => {
+			let counts_str = counts
 				.iter()
 				.map(|c| format!("{} - {}", c.emote, c.count))
 				.collect::<Vec<_>>()
-				.join("\n")
-		),
+				.join("\n");
+			if is_user {
+				format!("Here are your counts:\n{counts_str}")
+			} else {
+				format!("Here are <@{query_user_id}>'s counts:\n{counts_str}")
+			}
+		}
 	};
 	response!(content, false)
 }
