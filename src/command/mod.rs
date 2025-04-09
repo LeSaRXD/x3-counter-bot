@@ -7,18 +7,32 @@ use serenity::all::{Command, CreateCommand};
 macro_rules! arg {
 	(Int, $name:literal, $desc:literal, $required:literal, $min:expr, $max:expr) => {
 		IntArg {
-			name: $name,
-			description: $desc,
-			required: $required,
+			base: BaseArg {
+				name: $name,
+				description: $desc,
+				required: $required,
+			},
 			min: $min,
 			max: $max,
 		}
 	};
 	(User, $name:literal, $desc:literal, $required:literal) => {
 		UserArg {
-			name: $name,
-			description: $desc,
-			required: $required,
+			base: BaseArg {
+				name: $name,
+				description: $desc,
+				required: $required,
+			},
+		}
+	};
+	(String, $name:literal, $desc:literal, $required:literal, $choices:expr) => {
+		StringArg {
+			base: BaseArg {
+				name: $name,
+				description: $desc,
+				required: $required,
+			},
+			choices: $choices,
 		}
 	};
 }

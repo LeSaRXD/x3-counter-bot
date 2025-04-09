@@ -1,4 +1,7 @@
-use std::collections::{hash_map::Entry, HashMap};
+use std::{
+	collections::{hash_map::Entry, HashMap},
+	str,
+};
 
 use serenity::all::{
 	CommandDataOptionValue, CommandInteraction, CreateAllowedMentions,
@@ -11,7 +14,7 @@ use crate::{
 	database::{DatabaseHandler, LeaderboardRow},
 };
 
-use super::args::{IntArg, IntoCommandArg, UserArg};
+use super::args::{BaseArg, IntArg, IntoCommandArg, StringArg, UserArg};
 
 fn postfix(count: i64) -> &'static str {
 	match count % 10 {
@@ -23,10 +26,10 @@ fn postfix(count: i64) -> &'static str {
 
 macro_rules! response {
 	(server error) => {
-		response!("You can only run this command in a server (this should not be possible)")
+		return response!("You can only run this command in a server (this should not be possible)")
 	};
 	(argument error) => {
-		response!("Incorrect argument type provided (this should not be possible)")
+		return response!("Incorrect argument type provided (this should not be possible)")
 	};
 	($res:expr) => {
 		Ok(CreateInteractionResponseMessage::new()
@@ -58,6 +61,14 @@ const LEADERBOARD_COUNT_ARG: IntArg = arg!(
 	false,
 	Some(1),
 	Some(5)
+);
+
+const LEADERBOARD_EMOTE_ARG: StringArg = arg!(
+	String,
+	"emote",
+	"Which emote leaderboard to display",
+	true,
+	include_str!("emotes.txt")
 );
 
 const COUNTS_USER_ARG: UserArg = arg!(User, "user", "The user whose counts to display", false);
@@ -112,7 +123,7 @@ pub async fn silent(
 				)
 			} else {
 				eprintln!("Argument {} has incorrect type", arg.name);
-				return response!(argument error);
+				response!(argument error);
 			}
 		}
 	};
@@ -154,7 +165,7 @@ pub async fn counts(
 				Some(user_arg_id.get())
 			} else {
 				eprintln!("Argument {} has incorrect type", arg.name);
-				return response!(argument error);
+				response!(argument error);
 			}
 		}
 	};
@@ -193,27 +204,46 @@ command!(
 	"leaderboard",
 	"Get the x3 leaderboard for this server",
 	false,
-	[LEADERBOARD_COUNT_ARG]
+	[LEADERBOARD_EMOTE_ARG, LEADERBOARD_COUNT_ARG]
 );
 pub async fn leaderboard(
 	db: &DatabaseHandler,
 	cmd: &CommandInteraction,
 ) -> sqlx::Result<CreateInteractionResponseMessage> {
 	let Some(server_id) = cmd.guild_id else {
-		return response!(server error);
+		response!(server error);
 	};
 	let server_id = server_id.get();
 
-	let leaderboard = match cmd.data.options.as_slice() {
-		[] => db.leaderboard(server_id, 3i64).await?,
-		[arg, ..] => {
-			if let CommandDataOptionValue::Integer(count) = arg.value {
-				db.leaderboard(server_id, count).await?
+	let mut args = cmd.data.options.to_owned();
+	args.sort_by(|l, r| l.name.cmp(&r.name));
+
+	let leaderboard = match args.as_slice() {
+		[] => {
+			eprintln!("No arguments provided when emote is required");
+			response!(argument error);
+		}
+		[emote_arg] => {
+			if let CommandDataOptionValue::String(emote) = &emote_arg.value {
+				db.leaderboard(server_id, 3i64, emote).await?
 			} else {
-				eprintln!("Argument {} has incorrect type", arg.name);
-				return response!(argument error);
+				eprintln!("Only argument should be emote argument");
+				response!(argument error);
 			}
 		}
+		[count_arg, emote_arg, ..] => match (&count_arg.value, &emote_arg.value) {
+			(CommandDataOptionValue::Integer(count), CommandDataOptionValue::String(emote)) => {
+				db.leaderboard(server_id, *count, emote).await?
+			}
+			(CommandDataOptionValue::Integer(_), _) => {
+				eprintln!("Argument {} has incorrect type", emote_arg.name);
+				response!(argument error);
+			}
+			(_, _) => {
+				eprintln!("Argument {} has incorrect type", count_arg.name);
+				response!(argument error);
+			}
+		},
 	};
 	let mut emote_map: HashMap<Box<str>, Vec<LeaderboardRow>> = HashMap::new();
 	for row in leaderboard {
@@ -251,7 +281,7 @@ pub async fn mute_all(
 	cmd: &CommandInteraction,
 ) -> sqlx::Result<CreateInteractionResponseMessage> {
 	let Some(server_id) = cmd.guild_id else {
-		return response!(server error);
+		response!(server error);
 	};
 	let server_id = server_id.get();
 
@@ -271,7 +301,7 @@ pub async fn mute_all(
 				)
 			} else {
 				eprintln!("Argument {} has incorrect type", arg.name);
-				return response!(argument error);
+				response!(argument error);
 			}
 		}
 	};
@@ -291,7 +321,7 @@ pub async fn unmute_all(
 	cmd: &CommandInteraction,
 ) -> sqlx::Result<CreateInteractionResponseMessage> {
 	let Some(server_id) = cmd.guild_id else {
-		return response!(server error);
+		response!(server error);
 	};
 	let server_id = server_id.get();
 

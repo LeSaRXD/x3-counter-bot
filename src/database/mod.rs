@@ -183,15 +183,19 @@ impl DatabaseHandler {
 		&self,
 		server_id: impl Into<PsqlU64>,
 		top: impl Into<PsqlU64>,
+		mut emote: &str,
 	) -> sqlx::Result<Vec<LeaderboardRow>> {
 		let top = top.into();
 		let server_id = server_id.into();
+		if emote == "*" {
+			emote = "%";
+		}
 		sqlx::query_as!(
 			LeaderboardRow,
 			r#"WITH ranked AS (
 				SELECT user_id, emote, count,
 				DENSE_RANK() OVER (PARTITION BY emote ORDER BY count DESC) AS rank
-				FROM counter WHERE server_id = $1
+				FROM counter WHERE server_id = $1 AND emote LIKE $2
 			)
 			SELECT
 				emote,
@@ -199,9 +203,10 @@ impl DatabaseHandler {
 				count,
 				rank AS "rank!"
 			FROM ranked
-			WHERE rank <= $2
+			WHERE rank <= $3
 			ORDER BY emote, rank ASC"#,
 			i64::from(server_id),
+			emote,
 			i64::from(top),
 		)
 		.fetch_all(&self.pool)

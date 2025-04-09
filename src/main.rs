@@ -17,8 +17,6 @@ use serenity::model::channel::Message;
 use serenity::model::gateway::Ready;
 use serenity::prelude::*;
 use sqlx::Pool;
-use tokio::fs::File;
-use tokio::io::AsyncReadExt;
 
 struct Handler {
 	regex: Regex,
@@ -208,15 +206,9 @@ async fn main() {
 	let pool = Pool::connect(&db_url).await.unwrap();
 	let db_handler = DatabaseHandler::new(pool);
 
-	let mut regex = String::new();
-	File::open("regex.txt")
-		.await
-		.expect("Expected regex.txt to exist")
-		.read_to_string(&mut regex)
-		.await
-		.expect("Expected to read file regex.txt");
+	let regex = include_str!("regex.txt");
 	let regex_captures = regex.chars().filter(|c| *c == '(').count();
-	let regex = Regex::new(&regex).expect("Expected a valid regex expression");
+	let regex = Regex::new(regex).expect("Expected a valid regex expression");
 
 	let intents = GatewayIntents::GUILD_MESSAGES
 		| GatewayIntents::DIRECT_MESSAGES
