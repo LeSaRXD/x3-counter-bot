@@ -1,6 +1,6 @@
 {
   "db_name": "PostgreSQL",
-  "query": "SELECT emote, SUM(count) as \"count!\" FROM counter WHERE user_id = $1 AND server_id = $2 GROUP BY emote",
+  "query": "SELECT\n\t\t\temote, SUM(count) as \"count!\"\n\t\t\tFROM counter WHERE user_id = $1 AND server_id = $2\n\t\t\tGROUP BY emote\n\t\t\tORDER BY \"count!\" DESC",
   "describe": {
     "columns": [
       {
@@ -25,5 +25,5 @@
       null
     ]
   },
-  "hash": "448c2fae40dcbc3b0ea2e8edd4eae35c411427670da00fa873281bbce9562f04"
+  "hash": "c14538d4fd06c8986506b2ea464a52b031ea77c488b7850099bb67df55494cfd"
 }

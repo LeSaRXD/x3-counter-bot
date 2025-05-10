@@ -80,7 +80,12 @@ impl DatabaseHandler {
 		let user_id = user_id.into();
 		sqlx::query_as!(
 			UserCount,
-			r#"SELECT emote, SUM(count) as "count!" FROM counter WHERE user_id = $1 GROUP BY emote"#,
+			r#"SELECT
+			emote, SUM(count) as "count!"
+			FROM counter
+			WHERE user_id = $1
+			GROUP BY emote
+			ORDER BY "count!" DESC"#,
 			i64::from(user_id)
 		)
 		.fetch_all(&self.pool)
@@ -95,7 +100,11 @@ impl DatabaseHandler {
 		let server_id = server_id.into();
 		sqlx::query_as!(
 			UserCount,
-			r#"SELECT emote, SUM(count) as "count!" FROM counter WHERE user_id = $1 AND server_id = $2 GROUP BY emote"#,
+			r#"SELECT
+			emote, SUM(count) as "count!"
+			FROM counter WHERE user_id = $1 AND server_id = $2
+			GROUP BY emote
+			ORDER BY "count!" DESC"#,
 			i64::from(user_id),
 			i64::from(server_id),
 		)
