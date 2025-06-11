@@ -192,7 +192,7 @@ impl EventHandler for Handler {
 		};
 
 		if let Err(why) = command.create_response(&ctx.http, response).await {
-			println!("Cannot respond to slash command: {why}");
+			eprintln!("Cannot respond to slash command: {why}");
 		}
 	}
 }
@@ -206,7 +206,7 @@ async fn main() {
 	let pool = Pool::connect(&db_url).await.unwrap();
 	let db_handler = DatabaseHandler::new(pool);
 
-	let regex = include_str!("regex.txt");
+	let regex = include_str!("regex.txt").trim();
 	let regex_captures = regex.chars().filter(|c| *c == '(').count();
 	let regex = Regex::new(regex).expect("Expected a valid regex expression");
 
@@ -226,6 +226,6 @@ async fn main() {
 		.expect("Err creating client");
 
 	if let Err(why) = client.start().await {
-		println!("Client error: {why:?}");
+		eprintln!("Client error: {why:?}");
 	}
 }
